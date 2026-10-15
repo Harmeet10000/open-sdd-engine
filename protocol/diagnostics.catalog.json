@@ -1,0 +1,262 @@
+{
+  "catalogSchemaVersion": "sdd.diagnostic-catalog/1",
+  "namespaces": [
+    {
+      "prefix": "DIAG_",
+      "registryOwner": "sdd-engine-foundation",
+      "contributors": ["sdd-engine-foundation", "sdd-workspace-transactions"]
+    },
+    {
+      "prefix": "WORKFLOW_",
+      "registryOwner": "sdd-engine-foundation",
+      "contributors": ["sdd-workflow-graph"]
+    },
+    {
+      "prefix": "VALIDATION_",
+      "registryOwner": "sdd-engine-foundation",
+      "contributors": ["sdd-artifact-validation"]
+    },
+    {
+      "prefix": "COMPLETION_",
+      "registryOwner": "sdd-engine-foundation",
+      "contributors": ["sdd-completion-lifecycle"]
+    },
+    {
+      "prefix": "BUG_",
+      "registryOwner": "sdd-engine-foundation",
+      "contributors": ["sdd-guided-workflows"]
+    },
+    {
+      "prefix": "QUICK_SPEC_",
+      "registryOwner": "sdd-engine-foundation",
+      "contributors": ["sdd-guided-workflows"]
+    }
+  ],
+  "codes": [
+    {
+      "code": "DIAG_SUCCESS",
+      "owner": "sdd-engine-foundation",
+      "severity": "info",
+      "exitCode": 0,
+      "sourceKinds": ["engine"],
+      "remediation": "No action is required.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_USAGE_ERROR",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 2,
+      "sourceKinds": ["command", "field"],
+      "remediation": "Correct the command or payload using the structured usage details.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_COMMAND_UNKNOWN",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 2,
+      "sourceKinds": ["command"],
+      "remediation": "Use a command supported by the negotiated protocol version.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_WORKSPACE_NOT_FOUND",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workspace", "path"],
+      "remediation": "Select an initialized workspace root explicitly.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_WORKSPACE_VERSION_INCOMPATIBLE",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workspace", "schema"],
+      "remediation": "Use a compatible binary or run an explicit supported migration.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_WORKSPACE_SELECTION_AMBIGUOUS",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workspace", "work"],
+      "remediation": "Select the immutable work ID explicitly.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_WORK_ITEM_NOT_FOUND",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["work"],
+      "remediation": "Inspect active work items and select an existing immutable ID.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_STALE_REVISION",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["workspace", "work", "artifact", "action"],
+      "remediation": "Refresh the snapshot and rebuild the proposal against the current revision.",
+      "retryable": true
+    },
+    {
+      "code": "DIAG_PLAN_NOT_AUTHORIZABLE",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 6,
+      "sourceKinds": ["plan", "policy"],
+      "remediation": "Resolve unsupported effects or policy blockers before requesting authorization.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_INTERRUPTED",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 130,
+      "sourceKinds": ["engine", "process", "transaction"],
+      "remediation": "Inspect the reported recovery state before retrying.",
+      "retryable": true
+    },
+    {
+      "code": "DIAG_SNAPSHOT_UNSTABLE",
+      "owner": "sdd-workspace-transactions",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["workspace", "path", "transaction"],
+      "remediation": "Stop concurrent changes and capture a fresh coherent snapshot.",
+      "retryable": true
+    },
+    {
+      "code": "DIAG_RECOVERY_REQUIRED",
+      "owner": "sdd-workspace-transactions",
+      "severity": "critical",
+      "exitCode": 4,
+      "sourceKinds": ["workspace", "transaction"],
+      "remediation": "Inspect and explicitly recover the prepared transaction before continuing.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_PRECONDITION_CHANGED",
+      "owner": "sdd-workspace-transactions",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["path", "plan"],
+      "remediation": "Capture a new snapshot and rebuild the exact plan.",
+      "retryable": true
+    },
+    {
+      "code": "DIAG_IDEMPOTENCY_CONFLICT",
+      "owner": "sdd-workspace-transactions",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["transaction", "command"],
+      "remediation": "Reuse the key only with the identical normalized request or choose a new key.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_IDEMPOTENCY_EXPIRED",
+      "owner": "sdd-workspace-transactions",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["transaction"],
+      "remediation": "Inspect current state before creating a new idempotency key.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_AUTHORIZATION_INVALID",
+      "owner": "sdd-workspace-transactions",
+      "severity": "error",
+      "exitCode": 6,
+      "sourceKinds": ["authorization", "plan"],
+      "remediation": "Obtain authorization bound to the exact current plan and policy.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_AUTHORIZATION_REVOKED",
+      "owner": "sdd-workspace-transactions",
+      "severity": "critical",
+      "exitCode": 6,
+      "sourceKinds": ["authorization", "policy"],
+      "remediation": "Obtain a fresh authorization after resolving the revocation.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_LOCK_TIMEOUT",
+      "owner": "sdd-workspace-transactions",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["workspace", "transaction"],
+      "remediation": "Inspect the lock owner and retry only after the active operation finishes.",
+      "retryable": true
+    },
+    {
+      "code": "DIAG_JOURNAL_CORRUPT",
+      "owner": "sdd-workspace-transactions",
+      "severity": "critical",
+      "exitCode": 3,
+      "sourceKinds": ["journal", "workspace"],
+      "remediation": "Stop mutation and inspect the last valid journal frame and recovery records.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_TRANSACTION_QUARANTINED",
+      "owner": "sdd-workspace-transactions",
+      "severity": "critical",
+      "exitCode": 4,
+      "sourceKinds": ["transaction", "workspace"],
+      "remediation": "Resolve the violated recovery fact under explicit authority.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_PATH_UNSAFE",
+      "owner": "sdd-workspace-transactions",
+      "severity": "critical",
+      "exitCode": 3,
+      "sourceKinds": ["path", "workspace"],
+      "remediation": "Use a normalized contained workspace-relative path.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_PATH_COLLISION",
+      "owner": "sdd-workspace-transactions",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["path", "workspace"],
+      "remediation": "Rename colliding paths explicitly before retrying.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_UNSAFE_HARD_LINK",
+      "owner": "sdd-workspace-transactions",
+      "severity": "critical",
+      "exitCode": 3,
+      "sourceKinds": ["path", "workspace"],
+      "remediation": "Remove the unsafe alias or use a platform operation proven to replace without mutating it.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_FILESYSTEM_UNSUPPORTED",
+      "owner": "sdd-workspace-transactions",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workspace", "filesystem"],
+      "remediation": "Move the workspace to a supported filesystem or use a certified adapter.",
+      "retryable": false
+    },
+    {
+      "code": "DIAG_LIMIT_EXCEEDED",
+      "owner": "sdd-workspace-transactions",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workspace", "path", "field"],
+      "remediation": "Narrow the requested scope or use an approved larger bounded limit.",
+      "retryable": false
+    }
+  ]
+}

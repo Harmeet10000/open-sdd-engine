@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["version", "status", "results", "summary"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "status": { "enum": ["PASSED", "FAILED"] },
+    "results": { "type": "array" },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "number" },
+        "valid": { "type": "number" },
+        "invalid": { "type": "number" },
+        "errorCount": { "type": "number" },
+        "warningCount": { "type": "number" }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "open-sdd-engine-workspace",
+  "version": "0.1.0",
+  "description": "Kiro-compatible dual-loop spec-driven development CLI",
+  "type": "module",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "bun run --filter @open-sdd/cli build",
+    "test": "bunx vitest run",
+    "test:watch": "bunx vitest",
+    "typecheck": "bunx tsc -p packages/core/tsconfig.json --noEmit && bunx tsc -p packages/cli/tsconfig.json --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

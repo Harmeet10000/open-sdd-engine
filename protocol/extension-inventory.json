@@ -1,0 +1,151 @@
+{
+  "inventorySchemaVersion": "sdd.protocol-extension-inventory/1",
+  "publishedVersion": "1.0",
+  "latestAllocatedVersion": "1.1",
+  "envelope": {
+    "owner": "sdd-engine-foundation",
+    "versionField": "schemaVersion",
+    "forbiddenVersionFields": ["protocolVersion"],
+    "requiredFields": [
+      "schemaVersion",
+      "command",
+      "ok",
+      "workspace",
+      "work",
+      "result",
+      "diagnostics",
+      "nextActions",
+      "exitCode"
+    ]
+  },
+  "versions": [
+    {
+      "version": "1.0",
+      "status": "published",
+      "extends": null,
+      "commands": ["doctor", "start", "status", "version"],
+      "resultKinds": ["doctor", "start-dry-run", "status", "version"]
+    },
+    {
+      "version": "1.1",
+      "status": "allocated",
+      "extends": "1.0",
+      "commands": ["finish", "next", "recover", "submit"],
+      "resultKinds": [
+        "completion",
+        "next-action",
+        "submission",
+        "validation",
+        "work-started",
+        "workspace-recovery"
+      ]
+    }
+  ],
+  "allocations": [
+    {
+      "id": "foundation-envelope",
+      "owner": "sdd-engine-foundation",
+      "introducedIn": "1.0",
+      "status": "published",
+      "owns": [
+        "envelope",
+        "command-discriminator",
+        "result-discriminator",
+        "diagnostics",
+        "source-ranges",
+        "next-actions",
+        "exit-taxonomy",
+        "version-negotiation"
+      ]
+    },
+    {
+      "id": "workspace-transactions",
+      "owner": "sdd-workspace-transactions",
+      "introducedIn": "1.1",
+      "status": "allocated",
+      "owns": [
+        "raw-snapshot",
+        "exact-plan",
+        "apply-outcome",
+        "recovery-outcome",
+        "idempotency-outcome",
+        "workspace-recovery-result",
+        "extended-plan-effects"
+      ],
+      "effectKinds": [
+        "create-directory",
+        "metadata-update",
+        "move-file",
+        "remove-empty-directory"
+      ]
+    },
+    {
+      "id": "workflow-graph",
+      "owner": "sdd-workflow-graph",
+      "introducedIn": "1.1",
+      "status": "allocated",
+      "owns": [
+        "compiled-graph-identity",
+        "workflow-state",
+        "action-proposal",
+        "next-action-result",
+        "composition-decision"
+      ]
+    },
+    {
+      "id": "artifact-validation",
+      "owner": "sdd-artifact-validation",
+      "introducedIn": "1.1",
+      "status": "allocated",
+      "owns": [
+        "typed-artifact",
+        "artifact-digest-set",
+        "artifact-delta",
+        "validation-request",
+        "validation-result",
+        "validation-result-kind"
+      ]
+    },
+    {
+      "id": "completion-lifecycle",
+      "owner": "sdd-completion-lifecycle",
+      "introducedIn": "1.1",
+      "status": "allocated",
+      "owns": [
+        "candidate-subject",
+        "accepted-completion-facts",
+        "completion-proposal",
+        "completion-result-kind",
+        "done-document",
+        "completion-receipt"
+      ]
+    },
+    {
+      "id": "guided-workflows",
+      "owner": "sdd-guided-workflows",
+      "introducedIn": "1.1",
+      "status": "allocated",
+      "owns": [
+        "start-payload-extension",
+        "next-payload",
+        "submit-payload",
+        "finish-payload",
+        "work-started-result",
+        "submission-result",
+        "scope-baseline-payload"
+      ]
+    },
+    {
+      "id": "bounded-execution",
+      "owner": "sdd-bounded-execution",
+      "introducedIn": "1.1",
+      "status": "reserved",
+      "owns": [
+        "execution-attempt",
+        "execution-result",
+        "claim-fact",
+        "provider-capability-fact"
+      ]
+    }
+  ]
+}

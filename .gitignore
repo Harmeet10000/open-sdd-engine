@@ -1,0 +1,30 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Local editor and agent caches
+.opencode/
+.idea/
+.vscode/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Go build, test, profiling, and coverage artifacts
+/sdd
+*.test
+*.prof
+*.pprof
+coverage.out
+coverage.html
+
+# Rehydratable upstream checkouts; vendor/manifest.json pins their revisions.
+/vendor/upstreams/
+
+# Duplicate export artifact retained locally for reference.
+/openspec-sdd-methodology-enhancement.zip

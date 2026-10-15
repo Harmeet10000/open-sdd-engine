@@ -1,0 +1,160 @@
+# Implementation Tasks: sdd-engine-foundation
+
+## Scope and gates
+
+These tasks deliver an independently implementable foundation: native executable, protocol, read-only workspace snapshot/selection, and dry-run plan. They reserve seams for later `sdd-workspace-transactions`, `sdd-workflow-graph`, `sdd-artifact-validation`, and `sdd-completion-lifecycle` work without implementing or depending on those specs. Test drivers are Go `*_test.go` files in the package under test; `testdata/` contains fixtures only.
+
+Each task has a stable ID, requirement links, and a real dependency list. Waves are derived from the DAG; they are not a license to implement all models before observable slices.
+
+## Tasks
+
+### FND-001 — Freeze protocol vocabulary and schema inventory
+
+- [ ] FND-001 — Freeze protocol vocabulary and schema inventory
+- **Requirements:** REQ-002, REQ-003, REQ-008, REQ-009, REQ-010
+- **Depends on:** []
+- Record the product-plan envelope (`schemaVersion`, `command`, `ok`, `workspace`, `work`, `result`, `diagnostics`, `nextActions`), discriminated command/result kinds, nullability, severity, source object, structured next actions, and exit taxonomy.
+- **Done when:** a checked-in schema inventory and catalog map has no competing `protocolVersion` envelope and every referenced code has severity/exit/remediation metadata.
+- **Implementation progress (2026-10-15):** `protocol/extension-inventory.json` now centrally preserves published `1.0`, allocates-but-does-not-publish `1.1`, assigns one owner to every prerequisite/guided extension family, and forbids a competing `protocolVersion` envelope. `protocol/diagnostics.catalog.json` registers the shared namespaces and supplies complete core/workspace entries. Executable registry tests pass. This task remains unchecked until every referenced workflow, validation, completion, Bug Fix, and Quick Spec code has a complete catalog entry.
+
+### FND-002 — Add offline schema resolver and negative fixtures
+
+- [ ] FND-002 — Add offline schema resolver and negative fixtures
+- **Requirements:** REQ-002
+- **Depends on:** [FND-001]
+- Add normative schemas with corrected draft-07 dialect URI, stable `$id`, resolved local `$ref`s, closed discriminators, and valid JSON examples. Use a full draft-07 validator, including conditional keywords; do not use jq as schema validation. Convert symbolic documentation examples into complete, digest-correct runtime fixtures.
+- **Done when:** valid examples parse as JSON and malformed refs, null arrays, wrong result kinds, missing severity, string sources, and shell-only next actions fail validation.
+
+### FND-003 — Define immutable protocol types and outcome renderer seam
+
+- [ ] FND-003 — Define immutable protocol types and outcome renderer seam
+- **Requirements:** REQ-002, REQ-003, REQ-008
+- **Depends on:** [FND-002]
+- Implement typed command/result/outcome/diagnostic/next-action values and one renderer input. Preserve empty arrays and declared result nullability. Add redaction and renderer write-error paths.
+- **Done when:** human and JSON views derive from one outcome and schema fixtures validate both.
+
+### FND-004 — Build deterministic dependency ports
+
+- [ ] FND-004 — Build deterministic dependency ports
+- **Requirements:** REQ-003, REQ-015, REQ-016
+- **Depends on:** [FND-001]
+- Define narrow ports for immutable workspace observation, policy snapshot, filesystem fact reads, clock, and ID. Provide fixed-clock/fixed-ID and fault-injecting fakes. Signal entry points derive from caller context.
+- **Done when:** tests can control time/identity/cancellation without globals, intent-only IDs, or `context.Background()` replacement.
+
+### FND-005 — Implement snapshot decode/normalize and canonical layout discovery
+
+- [ ] FND-005 — Implement snapshot decode/normalize and canonical layout discovery
+- **Requirements:** REQ-006, REQ-013, REQ-017, REQ-018
+- **Depends on:** [FND-004]
+- Read canonical `.sdd/work/<slug>/work.yaml`; preserve immutable work ID, slug, revision, and explicit root rules. Implement no-workspace and invalid-explicit-root diagnostics without ancestor fallback. Do not mutate or reopen during pure evaluation.
+- **Done when:** empty, malformed, incompatible, multiple-active, invalid-root, and valid-work fixtures produce one immutable snapshot and stable diagnostics.
+
+### FND-006 — Implement typed canonicalization and digest set
+
+- [ ] FND-006 — Implement typed canonicalization and digest set
+- **Requirements:** REQ-002, REQ-007, REQ-017
+- **Depends on:** [FND-005]
+- Compute versioned blob, semantic, and derivation digests; bind workflow/policy/validator definition bytes, not names. Preserve meaningful Markdown whitespace/code/order and invalidate unknown meaning conservatively.
+- **Done when:** formatting-only and behavior-changing fixtures demonstrate the intended digest distinctions, including dirty working content not represented by Git HEAD.
+
+### FND-007 — Implement Engine.Execute error/cancellation rail
+
+- [ ] FND-007 — Implement Engine.Execute error/cancellation rail
+- **Requirements:** REQ-003, REQ-009, REQ-010, REQ-015
+- **Depends on:** [FND-003, FND-004, FND-005]
+- Implement decode → normalize → snapshot → decide → plan → verify → outcome for foundation commands. Map errors with `errors.Is/As` and explicit precedence, redact secrets, preserve cancellation, and propagate renderer writes.
+- **Done when:** malformed input, cancellation, workspace/schema error, conflict, policy error, external failure, validation failure, and internal defect each have stable category/code/exit behavior.
+
+### FND-008 — Implement version and help vertical slice
+
+- [ ] FND-008 — Implement version and help vertical slice
+- **Requirements:** REQ-001, REQ-004, REQ-013
+- **Depends on:** [FND-003, FND-007]
+- Implement version/help outside workspace with fixed/reproducible build metadata and no runtime Git/network/package lookup. Keep composition root shallow.
+- **Done when:** version human/JSON output is schema-valid and identical in meaning from empty and read-only working directories; help works without workspace discovery. Missing/inaccessible explicit workspace roots do not affect version/help.
+
+### FND-009 — Implement doctor vertical slice
+
+- [ ] FND-009 — Implement doctor vertical slice
+- **Requirements:** REQ-005, REQ-013
+- **Depends on:** [FND-005, FND-007]
+- Check executable, build metadata, current directory, workspace/layout/schema status, and required policy source. Return exit `3` for no workspace, malformed workspace, incompatible workspace, or missing required policy; never mutate or call external tools.
+- **Done when:** no-workspace is not reported as a passing doctor result and all checks share outcome rendering.
+
+### FND-010 — Implement status and explicit-selection vertical slice
+
+- [ ] FND-010 — Implement status and explicit-selection vertical slice
+- **Requirements:** REQ-006, REQ-018
+- **Depends on:** [FND-005, FND-007]
+- Report zero/one/selected work item; permit new-work selection with unrelated active items; reject an invalid explicit root without parent fallback. Keep status read-only.
+- **Done when:** selection fixtures cover zero, one, many, explicit valid, explicit invalid, and valid-parent/invalid-root cases.
+
+### FND-011 — Implement dry-run plan vertical slice
+
+- [ ] FND-011 — Implement dry-run plan vertical slice
+- **Requirements:** REQ-007, REQ-014, REQ-016
+- **Depends on:** [FND-006, FND-007, FND-010]
+- Build a meaningful, ordered, inspectable plan for canonical work creation with all digest/revision preconditions. Mark unsupported future operations non-authorizable; never apply.
+- **Done when:** `--dry-run` has non-empty operations, stable plan digest, structured next action, and byte-for-byte no-side-effect verification.
+
+### FND-012 — Implement CLI parsing, stream separation, and exits
+
+- [ ] FND-012 — Implement CLI parsing, stream separation, and exits
+- **Requirements:** REQ-008, REQ-009, REQ-011
+- **Depends on:** [FND-007, FND-008, FND-009, FND-010, FND-011]
+- Implement global flag semantics, non-interactive no-prompt behavior, concise usage failures, stdout/stderr separation, structured next actions, and stable exit mapping.
+- **Done when:** TTY, redirected, JSON, no-color, narrow-terminal, secret-redaction, and malformed-input fixtures pass without requiring prose parsing.
+
+### FND-013 — Add migration parity harness
+
+- [ ] FND-013 — Add migration parity harness
+- **Requirements:** REQ-012
+- **Depends on:** [FND-008, FND-009, FND-010, FND-011, FND-012]
+- Inventory the actual legacy CLI first (currently version and status); place only those frozen input/output fixtures in `testdata/legacy-typescript/`. Place executable harnesses in the relevant Go package as `*_test.go`. Doctor and `start --dry-run` receive new-contract fixtures, not fabricated legacy parity. Record intentional differences and remove the migration harness when parity is proven.
+- **Done when:** fixture metadata includes command/stdin/stdout/stderr/exit/schema and no test driver is hidden under `testdata`.
+
+### FND-014 — Record future transaction integration contract
+
+- [ ] FND-014 — Record future transaction integration contract
+- **Requirements:** REQ-007, REQ-009, REQ-017, REQ-018
+- **Depends on:** [FND-006, FND-011]
+- Record the future transaction seam: expected revision, workspace/work IDs, input/policy/workflow/validator digests, idempotency replay/conflict, uncertain recovery, trusted policy precedence, fail-closed removal/expiry/revocation, typed exception scope, and optional Git provenance. Do not execute these scenarios in foundation; they require the later transaction/workflow/completion runtimes.
+- **Done when:** the contract and fixture inventory are versioned as integration inputs, without claiming implementation or passing runtime tests here.
+
+### FND-015 — Add schema, static, and build verification
+
+- [ ] FND-015 — Add schema, static, and build verification
+- **Requirements:** REQ-001, REQ-002, REQ-016
+- **Depends on:** [FND-002, FND-012, FND-013]
+- Run format/static checks, full schema/ref/example validation, unit tests, reproducible builds with fixed inputs, native runtime smoke jobs for declared targets, and separate cross-build jobs. Use absolute binary paths after temporary-directory changes; never mask failures.
+- **Done when:** CI reports native runtime support separately from cross-build success and demonstrates deterministic build metadata.
+
+### FND-016 — Foundation conformance review and extension seam record
+
+- [ ] FND-016 — Foundation conformance review and extension seam record
+- **Requirements:** REQ-003, REQ-017, REQ-018
+- **Depends on:** [FND-014, FND-015]
+- Review package direction and deep `Engine.Execute` seam, inspect contradiction searches, and record extension seams for future transaction, workflow, artifact-validation, and completion specs. Do not claim their integration in foundation.
+- **Done when:** a reviewer can trace each REQ to an executable foundation fixture or a clearly labelled future integration contract.
+
+## DAG and derived scheduling
+
+The dependency graph above is the source of truth. A topological scheduler derives executable waves at runtime; no hand-written wave list is normative. It must reject unknown task IDs, duplicate IDs, self-dependencies, and cycles. A task is complete only when its observable slice and linked fixtures are complete.
+
+## Verification checklist
+
+- All JSON-labelled examples parse and validate against the same checked-in schemas.
+- `$ref` resolution works offline; negative fixtures reject missing refs and invalid discriminators.
+- No `*_test.go` lives under `testdata`.
+- No command mutates during status, doctor, or dry-run.
+- No runtime claim is inferred from a foreign cross-build.
+- No unsupported future Git/PR/merge, Bun, or performance claim appears in implementation acceptance.
+- Required foundation fixtures cover stale-free read-only selection, schema refs, empty-op dry-run rejection, redaction, renderer/cancellation failures, and native/cross-build distinction. Future transaction/workflow/completion scenarios (stale writers, idempotency, crash uncertainty, dirty candidate, policy exception revocation, and validator provenance) remain recorded as integration inputs and are not claimed as foundation runtime tests.
+
+## References
+
+- `requirements.md`
+- `docs/kiro-input/sdd-cli-spec-brief.md`
+- `docs/architecture/go-project-structure.md`
+- `.kiro/steering/go-engineering.md`
+- `.kiro/steering/cli-ux.md`

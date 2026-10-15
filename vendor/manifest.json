@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "purpose": "Pinned upstream compatibility sources under vendor/upstreams. They are templates and fixtures, never runtime dependencies.",
+  "upstreams": [
+    { "name": "OpenSpec", "repository": "https://github.com/Fission-AI/OpenSpec.git", "commit": "27b22ab4cbf530fa00e17f0f6b75a44d56777542", "integration": "change-loop artifact compatibility" },
+    { "name": "Spec Kit", "repository": "https://github.com/github/spec-kit.git", "commit": "a5560fcf137eb48b4cb0b3a230e202362a011142", "integration": "spec-loop workflow and template compatibility" },
+    { "name": "Ponytail", "repository": "https://github.com/DietrichGebert/ponytail.git", "commit": "16f29800fd2681bdf24f3eb4ccffe38be3baec6b", "integration": "minimal-diff skill policy" }
+  ]
+}

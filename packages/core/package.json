@@ -1,0 +1,16 @@
+{
+  "name": "@open-sdd/core",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./commands/*": "./src/commands/*.ts",
+    "./core/*": "./src/core/*.ts",
+    "./change/*": "./src/change/*.ts",
+    "./spec/*": "./src/spec/*.ts",
+    "./router/*": "./src/router/*.ts"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0",
+    "zod": "^3.24.4"
+  }
+}
