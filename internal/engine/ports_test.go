@@ -328,6 +328,50 @@ func TestOSFileFactsReadNativeDirectory(t *testing.T) {
 	}
 }
 
+func TestFixedClockZeroValueIsEpoch(t *testing.T) {
+	t.Parallel()
+
+	var clock testkit.FixedClock
+	if got := clock.Now(); !got.Equal(time.Unix(0, 0).UTC()) {
+		t.Fatalf("zero clock = %v, documented Unix epoch", got)
+	}
+}
+
+func TestMemFileFactsRejectDirectoryReads(t *testing.T) {
+	t.Parallel()
+
+	fake := testkit.NewMemFileFacts(map[string]testkit.MemFile{
+		"/repo/.sdd": {Kind: engine.FileKindDirectory},
+	})
+	if _, err := fake.ReadFile(context.Background(), "/repo/.sdd"); err == nil {
+		t.Fatal("directory read succeeded, native adapter fails it")
+	}
+}
+
+func TestMemFileFactsListsRootAndTrailingSlashes(t *testing.T) {
+	t.Parallel()
+
+	fake := testkit.NewMemFileFacts(map[string]testkit.MemFile{
+		"/repo/.sdd/workspace.yaml": {Bytes: []byte("w\n")},
+	})
+	for _, path := range []string{"/", "/repo/", "/repo/.sdd/"} {
+		entries, err := fake.ListDir(context.Background(), path)
+		if err != nil {
+			t.Fatalf("ListDir(%q) error = %v", path, err)
+		}
+		if len(entries) == 0 {
+			t.Fatalf("ListDir(%q) missed recorded children", path)
+		}
+	}
+	root, err := fake.ListDir(context.Background(), "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(root) != 1 || root[0].Name() != "repo" || root[0].Kind() != engine.FileKindDirectory {
+		t.Fatalf("root listing = %v", root)
+	}
+}
+
 func TestFileFactRejectsUnknownKind(t *testing.T) {
 	t.Parallel()
 

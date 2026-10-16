@@ -6,7 +6,37 @@ import (
 	"time"
 
 	"sdd.dev/sdd/internal/testkit"
+	"sdd.dev/sdd/internal/workspace"
 )
+
+func TestFixedSnapshotterIsolatesSnapshots(t *testing.T) {
+	t.Parallel()
+
+	bytes := []byte("workspaceId: ws-1\n")
+	fake := testkit.NewFixedSnapshotter(workspace.Snapshot{
+		SnapshotID: "snap-1",
+		Paths: []workspace.PathObservation{
+			{Path: ".sdd/workspace.yaml", Presence: workspace.Present, Kind: workspace.FileKindRegular, Bytes: bytes, Size: uint64(len(bytes))},
+		},
+	})
+	bytes[0] = 'X'
+
+	first, err := fake.Snapshot(t.Context(), workspace.SnapshotRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(first.Paths[0].Bytes) != "workspaceId: ws-1\n" {
+		t.Fatal("snapshotter aliases constructor input")
+	}
+	first.Paths[0].Bytes[0] = 'X'
+	second, err := fake.Snapshot(t.Context(), workspace.SnapshotRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(second.Paths[0].Bytes) != "workspaceId: ws-1\n" {
+		t.Fatal("snapshotter aliases returned snapshots")
+	}
+}
 
 func TestFakesAreSafeForConcurrentUse(t *testing.T) {
 	t.Parallel()

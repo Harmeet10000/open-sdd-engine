@@ -3,6 +3,8 @@ package engine
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 )
 
 type Outcome struct {
@@ -179,9 +181,18 @@ func cloneDiagnostics(values []Diagnostic) []Diagnostic {
 	cloned := make([]Diagnostic, 0, len(values))
 	for _, value := range values {
 		value.metadata = cloneStoredJSONObject(value.metadata)
+		value.source.rangeValue = cloneSourceRange(value.source.rangeValue)
 		cloned = append(cloned, value)
 	}
 	return cloned
+}
+
+func cloneSourceRange(value *SourceRange) *SourceRange {
+	if value == nil {
+		return nil
+	}
+	copyValue := SourceRange{path: value.path, start: value.start, end: clonePointer(value.end)}
+	return &copyValue
 }
 
 func cloneActions(values []NextAction) []NextAction {
@@ -299,10 +310,27 @@ func redactResult(value *Result, redact func(string) string) *Result {
 	return cloned
 }
 
+// credentialKeyPattern matches structured keys that name a credential
+// outright. Joined key=value text is handled by the caller's assignment
+// patterns; split key/value pairs need this rule because neither half
+// matches alone.
+var credentialKeyPattern = regexp.MustCompile(`(?i)^(password|passwd|token|secret|api[-_]?key)$`)
+
 func redactJSONObject(value map[string]any, redact func(string) string) map[string]any {
 	redacted := make(map[string]any, len(value))
 	for key, item := range value {
-		redacted[key] = redactJSONValue(item, redact)
+		redactedKey := redact(key)
+		if text, ok := item.(string); ok && credentialKeyPattern.MatchString(key) {
+			// Disguise the pair as joined assignment text so any redact
+			// function honors it, then strip the disguise. The engine
+			// stays marker-agnostic; an honoring function always changes
+			// the value half.
+			if rest, ok := strings.CutPrefix(redact(key+"="+text), key+"="); ok && rest != text {
+				redacted[redactedKey] = rest
+				continue
+			}
+		}
+		redacted[redactedKey] = redactJSONValue(item, redact)
 	}
 	return redacted
 }

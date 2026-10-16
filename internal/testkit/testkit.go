@@ -11,10 +11,12 @@ package testkit
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"sync"
 	"time"
@@ -32,10 +34,11 @@ var (
 )
 
 // FixedClock is a manually advanced Clock. The zero value reports the Unix
-// epoch; use NewFixedClock or Set to choose an instant.
+// epoch in UTC; use NewFixedClock or Set to choose another instant.
 type FixedClock struct {
 	mutex sync.Mutex
 	now   time.Time
+	set   bool
 }
 
 // NewFixedClock returns a clock fixed at the given instant, normalized to UTC.
@@ -45,10 +48,13 @@ func NewFixedClock(at time.Time) *FixedClock {
 	return clock
 }
 
-// Now returns the fixed instant.
+// Now returns the fixed instant, or the Unix epoch when never set.
 func (c *FixedClock) Now() time.Time {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	if !c.set {
+		return time.Unix(0, 0).UTC()
+	}
 	return c.now
 }
 
@@ -57,6 +63,7 @@ func (c *FixedClock) Set(at time.Time) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.now = at.UTC()
+	c.set = true
 }
 
 // Advance moves the fixed instant forward by the given duration.
@@ -128,7 +135,8 @@ type MemFileFacts struct {
 }
 
 // NewMemFileFacts returns a fake serving defensive copies of the given files.
-// A zero Kind means a regular file.
+// A zero Kind means a regular file. Keys are cleaned with filepath.Clean so
+// fixtures written with slash separators resolve on every OS.
 func NewMemFileFacts(files map[string]MemFile) *MemFileFacts {
 	cloned := make(map[string]MemFile, len(files))
 	for name, file := range files {
@@ -136,7 +144,7 @@ func NewMemFileFacts(files map[string]MemFile) *MemFileFacts {
 		if kind == "" {
 			kind = engine.FileKindRegular
 		}
-		cloned[name] = MemFile{
+		cloned[filepath.Clean(name)] = MemFile{
 			Bytes:   append([]byte{}, file.Bytes...),
 			Mode:    file.Mode,
 			ModTime: file.ModTime,
@@ -146,11 +154,17 @@ func NewMemFileFacts(files map[string]MemFile) *MemFileFacts {
 	return &MemFileFacts{files: cloned, faults: map[string]error{}, blocked: map[string]chan struct{}{}}
 }
 
+// memKey normalizes a lookup path the same way constructor keys are
+// normalized, so slash-written fixtures resolve under the host separator.
+func memKey(abspath string) string {
+	return filepath.Clean(abspath)
+}
+
 // InjectFault makes Stat and ReadFile for path fail with the given error.
 func (m *MemFileFacts) InjectFault(path string, err error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.faults[path] = err
+	m.faults[memKey(path)] = err
 }
 
 // BlockRead parks ReadFile for path until ReleaseRead closes the channel or
@@ -158,6 +172,7 @@ func (m *MemFileFacts) InjectFault(path string, err error) {
 func (m *MemFileFacts) BlockRead(path string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	path = memKey(path)
 	if _, ok := m.blocked[path]; !ok {
 		m.blocked[path] = make(chan struct{})
 	}
@@ -167,7 +182,7 @@ func (m *MemFileFacts) BlockRead(path string) {
 func (m *MemFileFacts) ReleaseRead(path string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	if channel, ok := m.blocked[path]; ok {
+	if channel, ok := m.blocked[memKey(path)]; ok {
 		close(channel)
 		delete(m.blocked, path)
 	}
@@ -181,15 +196,32 @@ func (m *MemFileFacts) Stat(ctx context.Context, abspath string) (engine.FileFac
 	if err := ctx.Err(); err != nil {
 		return engine.FileFact{}, err
 	}
+	abspath = memKey(abspath)
 	m.mutex.Lock()
 	fault, hasFault := m.faults[abspath]
 	file, ok := m.files[abspath]
+	hasChildren := false
+	if !ok && !hasFault {
+		prefix := abspath + "/"
+		if abspath == "/" {
+			prefix = "/"
+		}
+		for recorded := range m.files {
+			if recorded != abspath && len(recorded) > len(prefix) && recorded[:len(prefix)] == prefix {
+				hasChildren = true
+				break
+			}
+		}
+	}
 	m.mutex.Unlock()
 	if hasFault {
 		return engine.FileFact{}, fault
 	}
 	if !ok {
-		return engine.FileFact{}, fmt.Errorf("stat file facts: %w", fs.ErrNotExist)
+		if hasChildren {
+			return engine.NewFileFact(engine.FileFactInput{Kind: engine.FileKindDirectory})
+		}
+		return engine.FileFact{}, fmt.Errorf("%w: stat file facts: %w", engine.ErrDependencyFault, fs.ErrNotExist)
 	}
 	return engine.NewFileFact(engine.FileFactInput{
 		Kind:    file.Kind,
@@ -207,6 +239,7 @@ func (m *MemFileFacts) ReadFile(ctx context.Context, abspath string) ([]byte, er
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	abspath = memKey(abspath)
 	m.mutex.Lock()
 	fault, hasFault := m.faults[abspath]
 	file, ok := m.files[abspath]
@@ -216,7 +249,10 @@ func (m *MemFileFacts) ReadFile(ctx context.Context, abspath string) ([]byte, er
 		return nil, fault
 	}
 	if !ok {
-		return nil, fmt.Errorf("read file facts: %w", fs.ErrNotExist)
+		return nil, fmt.Errorf("%w: read file facts: %w", engine.ErrDependencyFault, fs.ErrNotExist)
+	}
+	if file.Kind == engine.FileKindDirectory {
+		return nil, fmt.Errorf("%w: read file facts on a directory", engine.ErrDependencyFault)
 	}
 	if blocked {
 		select {
@@ -231,7 +267,7 @@ func (m *MemFileFacts) ReadFile(ctx context.Context, abspath string) ([]byte, er
 		file, ok = m.files[abspath]
 		m.mutex.Unlock()
 		if !ok {
-			return nil, fmt.Errorf("read file facts: %w", fs.ErrNotExist)
+			return nil, fmt.Errorf("%w: read file facts: %w", engine.ErrDependencyFault, fs.ErrNotExist)
 		}
 	}
 	return append([]byte{}, file.Bytes...), nil
@@ -248,12 +284,16 @@ func (m *MemFileFacts) ListDir(ctx context.Context, abspath string) ([]engine.Di
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	abspath = memKey(abspath)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if fault, hasFault := m.faults[abspath]; hasFault {
 		return nil, fault
 	}
 	prefix := abspath + "/"
+	if abspath == "/" {
+		prefix = "/"
+	}
 	children := map[string]engine.FileKind{}
 	known := false
 	for recorded, file := range m.files {
@@ -279,7 +319,7 @@ func (m *MemFileFacts) ListDir(ctx context.Context, abspath string) ([]engine.Di
 		}
 	}
 	if !known {
-		return nil, fmt.Errorf("list directory facts: %w", fs.ErrNotExist)
+		return nil, fmt.Errorf("%w: list directory facts: %w", engine.ErrDependencyFault, fs.ErrNotExist)
 	}
 	names := slices.Sorted(maps.Keys(children))
 	entries := make([]engine.DirEntry, 0, len(names))
@@ -344,7 +384,9 @@ func (f *FixedPolicySnapshotter) InjectFault(err error) {
 }
 
 // FixedSnapshotter serves one canned workspace snapshot for engine tests
-// that need an observation without a real capturer.
+// that need an observation without a real capturer. The canned value is
+// deep-copied on construction and on every return, so mutating a returned
+// snapshot (or the constructor input) can never affect later observations.
 type FixedSnapshotter struct {
 	mutex    sync.Mutex
 	snapshot workspace.Snapshot
@@ -353,10 +395,10 @@ type FixedSnapshotter struct {
 
 // NewFixedSnapshotter returns a snapshotter serving the given snapshot.
 func NewFixedSnapshotter(snapshot workspace.Snapshot) *FixedSnapshotter {
-	return &FixedSnapshotter{snapshot: snapshot}
+	return &FixedSnapshotter{snapshot: copySnapshot(snapshot)}
 }
 
-// Snapshot returns the canned snapshot or the injected fault.
+// Snapshot returns an isolated copy of the canned snapshot or the injected fault.
 func (f *FixedSnapshotter) Snapshot(ctx context.Context, _ workspace.SnapshotRequest) (workspace.Snapshot, error) {
 	if err := ctx.Err(); err != nil {
 		return workspace.Snapshot{}, err
@@ -366,7 +408,21 @@ func (f *FixedSnapshotter) Snapshot(ctx context.Context, _ workspace.SnapshotReq
 	if f.fault != nil {
 		return workspace.Snapshot{}, f.fault
 	}
-	return f.snapshot, nil
+	return copySnapshot(f.snapshot), nil
+}
+
+func copySnapshot(snapshot workspace.Snapshot) workspace.Snapshot {
+	// Snapshot holds only JSON-safe values, so this marshal cannot fail;
+	// panicking keeps a broken fake loud instead of serving zero snapshots.
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		panic("testkit: snapshot is not JSON-copyable: " + err.Error())
+	}
+	var copied workspace.Snapshot
+	if err := json.Unmarshal(encoded, &copied); err != nil {
+		panic("testkit: snapshot copy failed: " + err.Error())
+	}
+	return copied
 }
 
 // InjectFault makes subsequent Snapshot calls fail.

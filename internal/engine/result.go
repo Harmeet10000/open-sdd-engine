@@ -412,8 +412,8 @@ func NewMutationPlan(input MutationPlanInput) (MutationPlan, error) {
 		policyDigest:              input.PolicyDigest,
 		workflowDefinitionDigest:  input.WorkflowDefinitionDigest,
 		validatorDefinitionDigest: input.ValidatorDefinitionDigest,
-		operations:                append([]PlanOperation{}, input.Operations...),
-		preconditions:             append([]PlanPrecondition{}, input.Preconditions...),
+		operations:                clonePlanOperations(input.Operations),
+		preconditions:             clonePlanPreconditions(input.Preconditions),
 		digest:                    input.Digest,
 		idempotencyKey:            input.IdempotencyKey,
 		authorizable:              input.Authorizable,
@@ -429,9 +429,9 @@ func (p MutationPlan) InputDigest() string               { return p.inputDigest 
 func (p MutationPlan) PolicyDigest() string              { return p.policyDigest }
 func (p MutationPlan) WorkflowDefinitionDigest() string  { return p.workflowDefinitionDigest }
 func (p MutationPlan) ValidatorDefinitionDigest() string { return p.validatorDefinitionDigest }
-func (p MutationPlan) Operations() []PlanOperation       { return append([]PlanOperation{}, p.operations...) }
+func (p MutationPlan) Operations() []PlanOperation       { return clonePlanOperations(p.operations) }
 func (p MutationPlan) Preconditions() []PlanPrecondition {
-	return append([]PlanPrecondition{}, p.preconditions...)
+	return clonePlanPreconditions(p.preconditions)
 }
 func (p MutationPlan) Digest() string         { return p.digest }
 func (p MutationPlan) IdempotencyKey() string { return p.idempotencyKey }
@@ -476,7 +476,7 @@ type StartDryRunResult struct {
 }
 
 func NewStartDryRunResult(plan MutationPlan) Result {
-	value := StartDryRunResult{plan: plan}
+	value := StartDryRunResult{plan: cloneMutationPlan(plan)}
 	return Result{kind: ResultStartDryRun, startDryRun: &value}
 }
 
@@ -528,7 +528,7 @@ func (r Result) StartDryRun() (StartDryRunResult, bool) {
 	if r.startDryRun == nil {
 		return StartDryRunResult{}, false
 	}
-	return *r.startDryRun, true
+	return StartDryRunResult{plan: cloneMutationPlan(r.startDryRun.plan)}, true
 }
 
 func (r Result) MarshalJSON() ([]byte, error) {
@@ -548,4 +548,23 @@ func (r Result) MarshalJSON() ([]byte, error) {
 
 func validDigest(value string) bool {
 	return digestPattern.MatchString(value)
+}
+
+func cloneMutationPlan(plan MutationPlan) MutationPlan {
+	plan.operations = clonePlanOperations(plan.operations)
+	plan.preconditions = clonePlanPreconditions(plan.preconditions)
+	return plan
+}
+
+func clonePlanOperations(values []PlanOperation) []PlanOperation {
+	cloned := make([]PlanOperation, 0, len(values))
+	for _, operation := range values {
+		operation.content = clonePointer(operation.content)
+		cloned = append(cloned, operation)
+	}
+	return cloned
+}
+
+func clonePlanPreconditions(values []PlanPrecondition) []PlanPrecondition {
+	return append(make([]PlanPrecondition, 0, len(values)), values...)
 }
