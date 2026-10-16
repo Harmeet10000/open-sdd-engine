@@ -202,9 +202,9 @@ func (m *MemFileFacts) Stat(ctx context.Context, abspath string) (engine.FileFac
 	file, ok := m.files[abspath]
 	hasChildren := false
 	if !ok && !hasFault {
-		prefix := abspath + "/"
-		if abspath == "/" {
-			prefix = "/"
+		prefix := abspath + string(filepath.Separator)
+		if abspath == string(filepath.Separator) {
+			prefix = string(filepath.Separator)
 		}
 		for recorded := range m.files {
 			if recorded != abspath && len(recorded) > len(prefix) && recorded[:len(prefix)] == prefix {
@@ -290,9 +290,9 @@ func (m *MemFileFacts) ListDir(ctx context.Context, abspath string) ([]engine.Di
 	if fault, hasFault := m.faults[abspath]; hasFault {
 		return nil, fault
 	}
-	prefix := abspath + "/"
-	if abspath == "/" {
-		prefix = "/"
+	prefix := abspath + string(filepath.Separator)
+	if abspath == string(filepath.Separator) {
+		prefix = string(filepath.Separator)
 	}
 	children := map[string]engine.FileKind{}
 	known := false
@@ -342,7 +342,7 @@ func cutPrefix(recorded, prefix string) (string, bool) {
 
 func splitComponent(rest string) (name, remainder string, hasMore bool) {
 	for i := 0; i < len(rest); i++ {
-		if rest[i] == '/' {
+		if rest[i] == '/' || rest[i] == '\\' {
 			return rest[:i], rest[i+1:], true
 		}
 	}
