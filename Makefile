@@ -1,6 +1,10 @@
 GO ?= go
 GO_MODULE_FLAGS ?= -mod=readonly
 MIN_COVERAGE ?= 70
+VERSION ?= 0.1.0-dev
+COMMIT ?= unknown
+BUILD_TIME ?= unknown
+BUILD_LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildTime=$(BUILD_TIME)
 GOLANGCI_LINT_VERSION ?= v2.14.0
 GOVULNCHECK_VERSION ?= v1.9.0
 GOSEC_VERSION ?= v2.29.0
@@ -10,7 +14,7 @@ GO_FILES := $(shell git ls-files '*.go'; git ls-files --others --exclude-standar
 
 .DEFAULT_GOAL := help
 
-.PHONY: actionlint ci commitlint coverage fmt fmt-check help install-tools \
+.PHONY: actionlint build ci commitlint coverage fmt fmt-check help install-tools \
 	lint list mod-check race security test test-current vet vuln
 
 help: ## Show the supported development commands.
@@ -22,6 +26,9 @@ help: ## Show the supported development commands.
 list: ## Verify all module and package imports resolve without mutation.
 	$(GO) list $(GO_MODULE_FLAGS) -m all
 	$(GO) list $(GO_MODULE_FLAGS) ./...
+
+build: ## Build the native sdd executable with fixed build metadata.
+	$(GO) build $(GO_MODULE_FLAGS) -trimpath -ldflags "$(BUILD_LDFLAGS)" -o sdd ./cmd/sdd
 
 fmt: ## Format every tracked or untracked Go source file.
 	gofmt -w $(GO_FILES)

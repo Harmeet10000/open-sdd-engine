@@ -1,0 +1,91 @@
+{
+  "contractVersion": "sdd.transaction-seam/1",
+  "owner": "sdd-workspace-transactions",
+  "consumers": ["sdd-engine-foundation", "sdd-guided-workflows"],
+  "note": "Integration input only. Foundation records this contract without implementing or executing any scenario below; workspace transactions own commit, recovery, and replay. No test in foundation executes these scenarios.",
+  "planBinding": {
+    "fields": [
+      "planId",
+      "workspaceId",
+      "workId",
+      "revisionScope",
+      "expectedRevision",
+      "inputDigest",
+      "policyDigest",
+      "workflowDefinitionDigest",
+      "validatorDefinitionDigest",
+      "operations",
+      "preconditions",
+      "digest",
+      "authorizable"
+    ],
+    "conditionalFields": ["idempotencyKey"],
+    "rules": [
+      "The fields above equal the published schema's required MutationPlan set; idempotencyKey is optional on the wire but bound into the plan digest whenever present.",
+      "The transaction re-reads and rechecks every field immediately before applying; a newly computed plan cannot inherit an earlier approval.",
+      "The recorded plan digest must verify (recompute-and-compare) before authorization is consulted.",
+      "Same idempotency key plus identical content returns the recorded result; same key plus changed content is a conflict.",
+      "A crash or timeout after prepare but before an observable commit returns recovery-required with the prepared transaction, never a guessed success."
+    ]
+  },
+  "policyPrecedence": {
+    "order": ["organization-trusted", "project-narrowing", "work-rationale"],
+    "failClosed": ["missing", "stale", "expired", "revoked", "unverifiable"],
+    "note": "Repository prose and work-local metadata never replace required organization policy; approval and exception authority require a trusted boundary."
+  },
+  "exceptionScope": {
+    "fields": ["actor", "grantScope", "authorizationEvidence", "policySnapshotDigest", "workScope", "issuedAt", "expiresAt", "revocationState", "preauthorizationChecks"],
+    "rules": [
+      "Exceptions are typed records, not owner text plus a Boolean.",
+      "Expired or revoked exceptions fail closed; removal and expiry are explicit lifecycle facts, not silent deletion."
+    ]
+  },
+  "gitProvenance": {
+    "optional": true,
+    "note": "Commit/tree/status observations may accompany a transaction as provenance only; they never substitute for work revision or dirty-snapshot identity."
+  },
+  "scenarioInventory": [
+    {
+      "id": "INT-TX-001",
+      "name": "same-key identical replay returns the recorded result",
+      "inputs": {"idempotencyKey": "idem-1", "planDigest": "sha256:<recorded>", "changed": false},
+      "expected": "recorded result, no duplicate effects"
+    },
+    {
+      "id": "INT-TX-002",
+      "name": "same-key changed content is a conflict",
+      "inputs": {"idempotencyKey": "idem-1", "planDigest": "sha256:<changed>", "changed": true},
+      "expected": "DIAG_IDEMPOTENCY_CONFLICT, no application"
+    },
+    {
+      "id": "INT-TX-003",
+      "name": "uncertain commit returns recovery-required",
+      "inputs": {"prepared": true, "commitObserved": false},
+      "expected": "DIAG_RECOVERY_REQUIRED with the prepared transaction"
+    },
+    {
+      "id": "INT-TX-004",
+      "name": "stale expected revision is a conflict",
+      "inputs": {"expectedRevision": 4, "currentRevision": 5},
+      "expected": "DIAG_STALE_REVISION, no application"
+    },
+    {
+      "id": "INT-TX-005",
+      "name": "revoked exception fails closed",
+      "inputs": {"exceptionRevocationState": "revoked"},
+      "expected": "DIAG_AUTHORIZATION_REVOKED, no application"
+    },
+    {
+      "id": "INT-TX-006",
+      "name": "expired required policy fails closed",
+      "inputs": {"policyExpiry": "past"},
+      "expected": "WORKFLOW_POLICY_UNAVAILABLE, no application"
+    },
+    {
+      "id": "INT-TX-007",
+      "name": "changed workflow definition invalidates prior approval",
+      "inputs": {"approvedDigest": "sha256:<old>", "currentDigest": "sha256:<new>"},
+      "expected": "re-approval required; old receipt stays immutable"
+    }
+  ]
+}

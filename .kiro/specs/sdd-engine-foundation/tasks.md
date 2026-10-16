@@ -127,27 +127,30 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-014 — Record future transaction integration contract
 
-- [ ] FND-014 — Record future transaction integration contract
+- [x] FND-014 — Record future transaction integration contract
 - **Requirements:** REQ-007, REQ-009, REQ-017, REQ-018
 - **Depends on:** [FND-006, FND-011]
 - Record the future transaction seam: expected revision, workspace/work IDs, input/policy/workflow/validator digests, idempotency replay/conflict, uncertain recovery, trusted policy precedence, fail-closed removal/expiry/revocation, typed exception scope, and optional Git provenance. Do not execute these scenarios in foundation; they require the later transaction/workflow/completion runtimes.
 - **Done when:** the contract and fixture inventory are versioned as integration inputs, without claiming implementation or passing runtime tests here.
+- **Completed (2026-10-17):** `protocol/testdata/integration/transaction-seam-v1.json` versions the seam contract (plan binding, policy precedence, exception scope, Git provenance, seven scenarios INT-TX-001..007); a structural test pins the version, owner, unique scenario IDs, and equality of binding fields with the schema's required MutationPlan set (caught and fixed an `idempotencyKey` optionality divergence). No scenario executes in foundation.
 
 ### FND-015 — Add schema, static, and build verification
 
-- [ ] FND-015 — Add schema, static, and build verification
+- [x] FND-015 — Add schema, static, and build verification
 - **Requirements:** REQ-001, REQ-002, REQ-016
 - **Depends on:** [FND-002, FND-012, FND-013]
 - Run format/static checks, full schema/ref/example validation, unit tests, reproducible builds with fixed inputs, native runtime smoke jobs for declared targets, and separate cross-build jobs. Use absolute binary paths after temporary-directory changes; never mask failures.
 - **Done when:** CI reports native runtime support separately from cross-build success and demonstrates deterministic build metadata.
+- **Completed (2026-10-17):** `make build` with fixed ldflags metadata; CI `smoke` job (absolute-path binary, temp-dir isolation, unmasked exit assertions for version/status/doctor/dry-run/unknown), `cross-build` matrix (linux/arm64, darwin/amd64+arm64, windows/amd64, compile-only, separately named), and `reproducible-build` job (two fixed-input builds byte-compared; proven locally identical). All three wired into required checks.
 
 ### FND-016 — Foundation conformance review and extension seam record
 
-- [ ] FND-016 — Foundation conformance review and extension seam record
+- [x] FND-016 — Foundation conformance review and extension seam record
 - **Requirements:** REQ-003, REQ-017, REQ-018
 - **Depends on:** [FND-014, FND-015]
 - Review package direction and deep `Engine.Execute` seam, inspect contradiction searches, and record extension seams for future transaction, workflow, artifact-validation, and completion specs. Do not claim their integration in foundation.
 - **Done when:** a reviewer can trace each REQ to an executable foundation fixture or a clearly labelled future integration contract.
+- **Completed (2026-10-17):** `docs/architecture/foundation-conformance.md` records the import-direction audit (with `go list` evidence), the full REQ-001..018 traceability matrix, reserved seams per future spec, contradiction-search results, and carried-forward limitations. No future integration claimed.
 
 ## DAG and derived scheduling
 
