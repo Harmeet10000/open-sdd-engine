@@ -118,11 +118,12 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-013 — Add migration parity harness
 
-- [ ] FND-013 — Add migration parity harness
+- [x] FND-013 — Add migration parity harness
 - **Requirements:** REQ-012
 - **Depends on:** [FND-008, FND-009, FND-010, FND-011, FND-012]
 - Inventory the actual legacy CLI first (currently version and status); place only those frozen input/output fixtures in `testdata/legacy-typescript/`. Place executable harnesses in the relevant Go package as `*_test.go`. Doctor and `start --dry-run` receive new-contract fixtures, not fabricated legacy parity. Record intentional differences and remove the migration harness when parity is proven.
 - **Done when:** fixture metadata includes command/stdin/stdout/stderr/exit/schema and no test driver is hidden under `testdata`.
+- **Completed (2026-10-17):** inventoried the real legacy CLI (commander `0.1.0`; `status [id]` over `.kiro` change/spec loops; no doctor, no dry-run) and captured six frozen fixtures from the shippable `dist` bundle (source tree cannot boot: missing `cognee.js`). `internal/cli/parity_test.go` asserts exit/item-count relations and forces documented intentional differences (silent-empty vs exit-3, invented missing-ID record vs `DIAG_WORK_ITEM_NOT_FOUND`, pretty `{items}` vs versioned envelope); the corpus directory rejects non-version/status fixtures.
 
 ### FND-014 — Record future transaction integration contract
 

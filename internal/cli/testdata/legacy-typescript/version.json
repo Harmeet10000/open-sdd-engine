@@ -1,0 +1,26 @@
+{
+  "name": "version",
+  "provenance": {
+    "cli": "packages/cli/dist/cli.js",
+    "argv": [
+      "--version"
+    ],
+    "cwd": "empty directory, no workspace",
+    "captured": "2026-10-17",
+    "runner": "bun 1.4.2",
+    "note": "Source tree packages/cli/src cannot boot (missing ../memory/cognee.js); fixtures captured from the checked-in dist bundle, which is the shippable legacy artifact."
+  },
+  "command": [
+    "--version"
+  ],
+  "stdin": "",
+  "stdout": "0.1.0\n",
+  "stderr": "",
+  "exitCode": 0,
+  "schemaVersion": "legacy-typescript/1",
+  "intentionalDifferences": [
+    "Legacy prints bare '0.1.0'; new CLI prints 'sdd <version> (<commit>)' human text and a version envelope in JSON mode.",
+    "Legacy --version ignores --json; new CLI --version honors --json with one envelope.",
+    "Exit code parity (0) and workspace-independence are preserved."
+  ]
+}

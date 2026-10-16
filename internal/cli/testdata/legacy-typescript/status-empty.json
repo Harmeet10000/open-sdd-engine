@@ -1,0 +1,25 @@
+{
+  "name": "status-empty",
+  "provenance": {
+    "cli": "packages/cli/dist/cli.js",
+    "argv": [
+      "status"
+    ],
+    "cwd": "empty directory, no workspace marker",
+    "captured": "2026-10-17",
+    "runner": "bun 1.4.2",
+    "note": "Source tree packages/cli/src cannot boot (missing ../memory/cognee.js); fixtures captured from the checked-in dist bundle, which is the shippable legacy artifact."
+  },
+  "command": [
+    "status"
+  ],
+  "stdin": "",
+  "stdout": "",
+  "stderr": "",
+  "exitCode": 0,
+  "schemaVersion": "legacy-typescript/1",
+  "intentionalDifferences": [
+    "Legacy prints nothing and exits 0 outside a workspace; new CLI exits 3 with DIAG_WORKSPACE_NOT_FOUND.",
+    "New CLI human text for zero items is 'No active work items.'; legacy prints nothing."
+  ]
+}
