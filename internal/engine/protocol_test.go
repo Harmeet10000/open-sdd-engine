@@ -302,8 +302,18 @@ func TestStructuredSourceAndFlagValidation(t *testing.T) {
 	if _, err := engine.NewPosition(0, 1, engine.PositionUTF8Byte); !errors.Is(err, engine.ErrInvalidProtocolValue) {
 		t.Fatalf("zero position error = %v", err)
 	}
+	if _, err := engine.NewSourceRange("spec.md", engine.Position{}, nil); !errors.Is(err, engine.ErrInvalidProtocolValue) {
+		t.Fatalf("zero start position error = %v", err)
+	}
 	if _, err := engine.NumberFlag(math.Inf(1)); !errors.Is(err, engine.ErrInvalidProtocolValue) {
 		t.Fatalf("infinite flag error = %v", err)
+	}
+
+	// Zero work references never reach the wire: the constructor drops them.
+	result := engine.NewStatusResult([]engine.WorkRef{{}, mustWork(t, "work-1", "one")})
+	status, ok := result.Status()
+	if !ok || len(status.WorkItems()) != 1 || status.WorkItems()[0].ID() != "work-1" {
+		t.Fatalf("zero work reference was not dropped: %#v", status)
 	}
 }
 

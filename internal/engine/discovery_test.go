@@ -107,10 +107,13 @@ func TestDiscoverLayoutRejectsInvalidLayouts(t *testing.T) {
 		"wrong version":        "formatVersion: 2\nworkspaceId: ws-1\nrevision: 1\n",
 		"zero version":         "formatVersion: 0\nworkspaceId: ws-1\nrevision: 1\n",
 		"missing workspace ID": "formatVersion: 1\nrevision: 1\n",
+		"missing revision":     "formatVersion: 1\nworkspaceId: ws-1\n",
 		"unknown field":        "formatVersion: 1\nworkspaceId: ws-1\nrevision: 1\nowner: alice\n",
 		"duplicate key":        "formatVersion: 1\nformatVersion: 1\nworkspaceId: ws-1\nrevision: 1\n",
 		"negative revision":    "formatVersion: 1\nworkspaceId: ws-1\nrevision: -1\n",
 		"trailing document":    "formatVersion: 1\nworkspaceId: ws-1\nrevision: 1\n---\nformatVersion: 1\n",
+		"trailing dashes":      "formatVersion: 1\nworkspaceId: ws-1\nrevision: 1\n---\n",
+		"trailing null":        "formatVersion: 1\nworkspaceId: ws-1\nrevision: 1\n---\nnull\n",
 	}
 	for name, manifest := range workspaceCases {
 		t.Run("workspace/"+name, func(t *testing.T) {
@@ -127,6 +130,7 @@ func TestDiscoverLayoutRejectsInvalidLayouts(t *testing.T) {
 		"wrong work version":    "schemaVersion: 0\nworkId: work-9\nslug: zebra\nrevision: 1\nstatus: active\ncomposition: bug-fix\n",
 		"malformed work record": "schemaVersion: [1\n",
 		"missing work status":   "schemaVersion: 1\nworkId: work-9\nslug: zebra\nrevision: 1\ncomposition: bug-fix\n",
+		"missing work revision": "schemaVersion: 1\nworkId: work-9\nslug: zebra\nstatus: active\ncomposition: bug-fix\n",
 		"slug mismatch":         "schemaVersion: 1\nworkId: work-9\nslug: other\nrevision: 1\nstatus: active\ncomposition: bug-fix\n",
 		"unknown work field":    "schemaVersion: 1\nworkId: work-9\nslug: zebra\nrevision: 1\nstatus: active\ncomposition: bug-fix\nowner: alice\n",
 	}
@@ -150,6 +154,31 @@ func assertIncompatible(t *testing.T, files map[string]testkit.MemFile) {
 	}
 	if got := engine.LayoutDiagnosticCode(err); got != "DIAG_WORKSPACE_VERSION_INCOMPATIBLE" {
 		t.Fatalf("diagnostic code = %q", got)
+	}
+}
+
+func TestDiscoverLayoutRejectsRelativeStartDir(t *testing.T) {
+	t.Parallel()
+
+	facts := testkit.NewMemFileFacts(discoveryFiles(nil))
+	if _, err := engine.DiscoverLayout(context.Background(), facts, ".", ""); !errors.Is(err, engine.ErrInvalidProtocolValue) {
+		t.Fatalf("relative start dir error = %v", err)
+	}
+	if _, err := engine.DiscoverLayout(context.Background(), facts, "repo", ""); !errors.Is(err, engine.ErrInvalidProtocolValue) {
+		t.Fatalf("relative start dir error = %v", err)
+	}
+}
+
+func TestDiscoverLayoutRejectsFileMarker(t *testing.T) {
+	t.Parallel()
+
+	facts := testkit.NewMemFileFacts(map[string]testkit.MemFile{
+		"/repo/.sdd/workspace.yaml": {Bytes: []byte(discoveryWorkspace)},
+		"/repo/child/.sdd":          {Bytes: []byte("not a directory\n")},
+	})
+	_, err := engine.DiscoverLayout(context.Background(), facts, "/repo/child", "")
+	if !errors.Is(err, engine.ErrWorkspaceIncompatible) {
+		t.Fatalf("file marker was skipped or misreported: %v", err)
 	}
 }
 

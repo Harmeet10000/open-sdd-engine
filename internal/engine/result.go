@@ -84,8 +84,19 @@ type StatusResult struct {
 	workItems []WorkRef
 }
 
+// NewStatusResult builds a status result. Zero work references (empty ID
+// or slug) are dropped so constructed results always satisfy the schema;
+// callers holding invalid references have a builder bug, and silent loss
+// here is safer than emitting an unpublishable envelope.
 func NewStatusResult(workItems []WorkRef) Result {
-	value := StatusResult{workItems: append([]WorkRef{}, workItems...)}
+	items := make([]WorkRef, 0, len(workItems))
+	for _, item := range workItems {
+		if item.ID() == "" || item.Slug() == "" {
+			continue
+		}
+		items = append(items, item)
+	}
+	value := StatusResult{workItems: items}
 	return Result{kind: ResultStatus, status: &value}
 }
 
@@ -388,15 +399,16 @@ func NewMutationPlan(input MutationPlanInput) (MutationPlan, error) {
 	if input.RevisionScope != RevisionWorkspace && input.RevisionScope != RevisionWork {
 		return MutationPlan{}, fmt.Errorf("%w: unsupported revision scope %q", ErrInvalidProtocolValue, input.RevisionScope)
 	}
-	for name, digest := range map[string]string{
-		"input":                input.InputDigest,
-		"policy":               input.PolicyDigest,
-		"workflow definition":  input.WorkflowDefinitionDigest,
-		"validator definition": input.ValidatorDefinitionDigest,
-		"plan":                 input.Digest,
-	} {
-		if !validDigest(digest) {
-			return MutationPlan{}, fmt.Errorf("%w: %s digest is malformed", ErrInvalidProtocolValue, name)
+	digests := []struct{ name, value string }{
+		{"input", input.InputDigest},
+		{"policy", input.PolicyDigest},
+		{"workflow definition", input.WorkflowDefinitionDigest},
+		{"validator definition", input.ValidatorDefinitionDigest},
+		{"plan", input.Digest},
+	}
+	for _, digest := range digests {
+		if !validDigest(digest.value) {
+			return MutationPlan{}, fmt.Errorf("%w: %s digest is malformed", ErrInvalidProtocolValue, digest.name)
 		}
 	}
 	if len(input.Operations) == 0 || len(input.Preconditions) == 0 {

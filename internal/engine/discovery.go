@@ -179,6 +179,9 @@ func DiscoverLayout(ctx context.Context, facts FileFacts, startDir, explicitRoot
 	if startDir == "" {
 		return Layout{}, fmt.Errorf("%w: discovery start directory is required", ErrInvalidProtocolValue)
 	}
+	if !filepath.IsAbs(startDir) {
+		return Layout{}, fmt.Errorf("%w: discovery start directory must be absolute", ErrInvalidProtocolValue)
+	}
 	current := filepath.Clean(startDir)
 	for {
 		if err := ctx.Err(); err != nil {
@@ -188,13 +191,14 @@ func DiscoverLayout(ctx context.Context, facts FileFacts, startDir, explicitRoot
 		stat, statErr := facts.Stat(ctx, marker)
 		switch {
 		case statErr == nil:
-			if stat.Kind() == FileKindDirectory {
-				layout, err := readLayout(ctx, facts, current)
-				if err != nil {
-					return Layout{}, err
-				}
-				return layout, nil
+			if stat.Kind() != FileKindDirectory {
+				return Layout{}, fmt.Errorf("%w: workspace marker %s is not a directory", ErrWorkspaceIncompatible, marker)
 			}
+			layout, err := readLayout(ctx, facts, current)
+			if err != nil {
+				return Layout{}, err
+			}
+			return layout, nil
 		case errors.Is(statErr, os.ErrNotExist):
 			// No marker here; keep climbing.
 		default:
@@ -263,9 +267,9 @@ func readLayout(ctx context.Context, facts FileFacts, root string) (Layout, erro
 }
 
 type workspaceManifest struct {
-	FormatVersion uint64 `yaml:"formatVersion"`
-	WorkspaceID   string `yaml:"workspaceId"`
-	Revision      uint64 `yaml:"revision"`
+	FormatVersion uint64  `yaml:"formatVersion"`
+	WorkspaceID   string  `yaml:"workspaceId"`
+	Revision      *uint64 `yaml:"revision"`
 }
 
 func decodeWorkspaceManifest(content []byte) (workspaceID string, revision uint64, err error) {
@@ -279,16 +283,19 @@ func decodeWorkspaceManifest(content []byte) (workspaceID string, revision uint6
 	if manifest.WorkspaceID == "" {
 		return "", 0, fmt.Errorf("%w: workspace manifest lacks a workspace ID", ErrWorkspaceIncompatible)
 	}
-	return manifest.WorkspaceID, manifest.Revision, nil
+	if manifest.Revision == nil {
+		return "", 0, fmt.Errorf("%w: workspace manifest lacks a revision", ErrWorkspaceIncompatible)
+	}
+	return manifest.WorkspaceID, *manifest.Revision, nil
 }
 
 type workManifest struct {
-	SchemaVersion uint64 `yaml:"schemaVersion"`
-	WorkID        string `yaml:"workId"`
-	Slug          string `yaml:"slug"`
-	Revision      uint64 `yaml:"revision"`
-	Status        string `yaml:"status"`
-	Composition   string `yaml:"composition"`
+	SchemaVersion uint64  `yaml:"schemaVersion"`
+	WorkID        string  `yaml:"workId"`
+	Slug          string  `yaml:"slug"`
+	Revision      *uint64 `yaml:"revision"`
+	Status        string  `yaml:"status"`
+	Composition   string  `yaml:"composition"`
 }
 
 func readWorkRecord(ctx context.Context, facts FileFacts, dir string) (WorkRecord, error) {
@@ -306,12 +313,15 @@ func readWorkRecord(ctx context.Context, facts FileFacts, dir string) (WorkRecor
 	if manifest.WorkID == "" || manifest.Slug == "" || manifest.Status == "" || manifest.Composition == "" {
 		return WorkRecord{}, fmt.Errorf("%w: work record lacks identity, status, or composition", ErrWorkspaceIncompatible)
 	}
+	if manifest.Revision == nil {
+		return WorkRecord{}, fmt.Errorf("%w: work record lacks a revision", ErrWorkspaceIncompatible)
+	}
 	return WorkRecord{
 		id:          manifest.WorkID,
 		slug:        manifest.Slug,
 		status:      manifest.Status,
 		composition: manifest.Composition,
-		revision:    manifest.Revision,
+		revision:    *manifest.Revision,
 	}, nil
 }
 
@@ -321,12 +331,15 @@ func decodeStrict(content []byte, target any) error {
 	if err := decoder.Decode(target); err != nil {
 		return err
 	}
+	// A second document of any shape, including an ostensibly empty one,
+	// is rejected: trailing records must never slip past the first.
 	var extra any
-	if err := decoder.Decode(&extra); err != nil && !errors.Is(err, io.EOF) {
+	switch err := decoder.Decode(&extra); {
+	case errors.Is(err, io.EOF):
+		return nil
+	case err != nil:
 		return err
-	}
-	if extra != nil {
+	default:
 		return fmt.Errorf("unexpected trailing document")
 	}
-	return nil
 }
