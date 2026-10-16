@@ -18,7 +18,7 @@ func executeEngineWithPolicy(
 	t *testing.T,
 	files map[string]testkit.MemFile,
 	floor []byte,
-	ids *testkit.SequenceIDSource,
+	ids engine.IDSource,
 ) *engine.Engine {
 	t.Helper()
 	policy, err := engine.NewPolicySnapshot(engine.PolicySnapshotInput{Source: "test-policy", Floor: floor})
@@ -488,6 +488,149 @@ func TestNewEngineIsolatesBuildInputs(t *testing.T) {
 	if version.BuildInputs()["epoch"] != "0" {
 		t.Fatal("engine aliases caller build inputs")
 	}
+}
+
+func TestExecuteDoctorMatrices(t *testing.T) {
+	t.Parallel()
+
+	malformed := executeEngine(t, map[string]testkit.MemFile{
+		"/repo/.sdd/workspace.yaml": {Bytes: []byte("formatVersion: [1\n")},
+	})
+	outcome := malformed.Execute(context.Background(), engine.NewDoctorCommand(""))
+	if outcome.OK() || outcome.ExitCode() != engine.ExitWorkspace {
+		t.Fatalf("malformed doctor: %#v", outcome)
+	}
+	if code := outcomeDiagnostic(t, outcome).Code(); code != "DIAG_WORKSPACE_VERSION_INCOMPATIBLE" {
+		t.Fatalf("malformed doctor code = %q", code)
+	}
+
+	incompatible := executeEngine(t, map[string]testkit.MemFile{
+		"/repo/.sdd/workspace.yaml": {Bytes: []byte("formatVersion: 2\nworkspaceId: ws-1\nrevision: 1\n")},
+	})
+	if failed := incompatible.Execute(context.Background(), engine.NewDoctorCommand("")); failed.OK() {
+		t.Fatalf("incompatible doctor succeeded: %#v", failed)
+	}
+
+	explicit := executeEngine(t, validLayoutFiles())
+	rooted := explicit.Execute(context.Background(), engine.NewDoctorCommand("/repo"))
+	if !rooted.OK() {
+		t.Fatalf("explicit-root doctor: %#v", outcomeDiagnostic(t, rooted))
+	}
+	if workspace := rooted.Workspace(); workspace == nil || workspace.Root() != "/repo" {
+		t.Fatalf("explicit-root doctor workspace: %#v", workspace)
+	}
+}
+
+func TestExecuteStatusIsReadOnlyAndExplicit(t *testing.T) {
+	t.Parallel()
+
+	files := validLayoutFiles()
+	facts := testkit.NewMemFileFacts(files)
+	policy, err := engine.NewPolicySnapshot(engine.PolicySnapshotInput{Source: "test-policy", Floor: []byte("floor: strict\n")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng, err := engine.NewEngine(engine.Dependencies{
+		Facts:   facts,
+		IDs:     testkit.NewSequenceIDSource("work"),
+		Policy:  testkit.NewFixedPolicySnapshotter(policy),
+		Workdir: "/repo",
+		Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []engine.Command{
+		engine.NewStatusCommand("", ""),
+		engine.NewStatusCommand("work-b", ""),
+		engine.NewDoctorCommand(""),
+	} {
+		if outcome := eng.Execute(context.Background(), command); !outcome.OK() {
+			t.Fatalf("read command failed: %#v", outcome)
+		}
+	}
+	for name, file := range files {
+		content, readErr := facts.ReadFile(context.Background(), name)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		if string(content) != string(file.Bytes) {
+			t.Fatalf("read-only command mutated %s", name)
+		}
+	}
+
+	invalid := eng.Execute(context.Background(), engine.NewStatusCommand("", "/repo/child"))
+	if invalid.OK() || invalid.ExitCode() != engine.ExitWorkspace {
+		t.Fatalf("invalid explicit root status: %#v", invalid)
+	}
+	if code := outcomeDiagnostic(t, invalid).Code(); code != "DIAG_WORKSPACE_NOT_FOUND" {
+		t.Fatalf("invalid root code = %q", code)
+	}
+}
+
+func TestExecuteDryRunHardening(t *testing.T) {
+	t.Parallel()
+
+	eng := executeEngine(t, validLayoutFiles())
+	outcome := eng.Execute(context.Background(), mustStart(t))
+	if !outcome.OK() {
+		t.Fatalf("dry-run: %#v", outcomeDiagnostic(t, outcome))
+	}
+	actions := outcome.NextActions()
+	if len(actions) != 1 || actions[0].Command() != "status" {
+		t.Fatalf("dry-run next actions: %v", actions)
+	}
+	revision := actions[0].ExpectedRevision()
+	if revision == nil || *revision != 11 {
+		t.Fatalf("dry-run next action lacks the layout revision: %v", actions[0])
+	}
+	start, _ := outcome.Result().StartDryRun()
+	plan := start.Plan()
+	operation := plan.Operations()[0]
+	if operation.Authorizable() {
+		t.Fatal("preview operation must not be authorizable")
+	}
+	content := operation.Content()
+	if content == nil {
+		t.Fatal("preview operation lacks proposed content")
+	}
+	// The proposed bytes must decode under the engine's own strict rules.
+	parsed, err := engine.DiscoverLayout(context.Background(), testkit.NewMemFileFacts(map[string]testkit.MemFile{
+		"/preview/.sdd/workspace.yaml":                         {Bytes: []byte(discoveryWorkspace)},
+		("/preview/.sdd/work/" + plan.WorkID() + "/work.yaml"): {Bytes: []byte(*content)},
+	}), "/preview", "")
+	if err != nil {
+		t.Fatalf("proposed content failed strict decode: %v", err)
+	}
+	if parsed.Works()[0].ID() != plan.WorkID() {
+		t.Fatal("proposed content does not describe the planned work item")
+	}
+
+	hostile := executeEngineWithPolicy(t, validLayoutFiles(), []byte("floor: strict\n"), &hostileIDs{ids: []string{"plan-1", "a/b"}})
+	if failed := hostile.Execute(context.Background(), mustStart(t)); failed.OK() {
+		t.Fatalf("hostile identity succeeded: %#v", failed)
+	} else if code := outcomeDiagnostic(t, failed).Code(); code != "DIAG_WORKSPACE_VERSION_INCOMPATIBLE" {
+		t.Fatalf("hostile identity code = %q", code)
+	}
+
+	empty := executeEngineWithPolicy(t, validLayoutFiles(), []byte("floor: strict\n"), &hostileIDs{ids: []string{"", "x"}})
+	if failed := empty.Execute(context.Background(), mustStart(t)); failed.OK() {
+		t.Fatalf("empty identity succeeded: %#v", failed)
+	}
+}
+
+type hostileIDs struct {
+	ids []string
+	pos int
+}
+
+func (h *hostileIDs) NewID() (string, error) {
+	if h.pos >= len(h.ids) {
+		return "fallback", nil
+	}
+	identity := h.ids[h.pos]
+	h.pos++
+	return identity, nil
 }
 
 func mustStart(t *testing.T) engine.Command {

@@ -73,35 +73,39 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-008 — Implement version and help vertical slice
 
-- [ ] FND-008 — Implement version and help vertical slice
+- [x] FND-008 — Implement version and help vertical slice
 - **Requirements:** REQ-001, REQ-004, REQ-013
 - **Depends on:** [FND-003, FND-007]
 - Implement version/help outside workspace with fixed/reproducible build metadata and no runtime Git/network/package lookup. Keep composition root shallow.
 - **Done when:** version human/JSON output is schema-valid and identical in meaning from empty and read-only working directories; help works without workspace discovery. Missing/inaccessible explicit workspace roots do not affect version/help.
+- **Completed (2026-10-17):** version executes with no filesystem or policy contact (proven by fault-injected ports and a nonexistent workdir) and validates against the published schema; `internal/presentation/help` owns static ANSI-free command-overview text naming only implemented commands.
 
 ### FND-009 — Implement doctor vertical slice
 
-- [ ] FND-009 — Implement doctor vertical slice
+- [x] FND-009 — Implement doctor vertical slice
 - **Requirements:** REQ-005, REQ-013
 - **Depends on:** [FND-005, FND-007]
 - Check executable, build metadata, current directory, workspace/layout/schema status, and required policy source. Return exit `3` for no workspace, malformed workspace, incompatible workspace, or missing required policy; never mutate or call external tools.
 - **Done when:** no-workspace is not reported as a passing doctor result and all checks share outcome rendering.
+- **Completed (2026-10-17):** five structured checks (executable, workdir, workspace, schema, policy) with malformed/incompatible/missing-policy matrices; failures carry partial checks in a schema-valid non-null result with exit `3`; engine doctor outcomes validate against the published schema including the failure case.
 
 ### FND-010 — Implement status and explicit-selection vertical slice
 
-- [ ] FND-010 — Implement status and explicit-selection vertical slice
+- [x] FND-010 — Implement status and explicit-selection vertical slice
 - **Requirements:** REQ-006, REQ-018
 - **Depends on:** [FND-005, FND-007]
 - Report zero/one/selected work item; permit new-work selection with unrelated active items; reject an invalid explicit root without parent fallback. Keep status read-only.
 - **Done when:** selection fixtures cover zero, one, many, explicit valid, explicit invalid, and valid-parent/invalid-root cases.
+- **Completed (2026-10-17):** Execute-level matrices for zero/one/many/explicit/explicit-invalid/valid-parent-invalid-root; status and doctor proven byte-identical read-only; explicit selection works despite unrelated active items; engine status outcomes validate against the published schema.
 
 ### FND-011 — Implement dry-run plan vertical slice
 
-- [ ] FND-011 — Implement dry-run plan vertical slice
+- [x] FND-011 — Implement dry-run plan vertical slice
 - **Requirements:** REQ-007, REQ-014, REQ-016
 - **Depends on:** [FND-006, FND-007, FND-010]
 - Build a meaningful, ordered, inspectable plan for canonical work creation with all digest/revision preconditions. Mark unsupported future operations non-authorizable; never apply.
 - **Done when:** `--dry-run` has non-empty operations, stable plan digest, structured next action, and byte-for-byte no-side-effect verification.
+- **Completed (2026-10-17):** non-empty verified plan with revision preconditions and non-authorizable operation; fixed IDs reproduce byte-identical envelopes (stable digest); structured `status --work` next action carrying the layout revision; proposed content dogfoods the strict decoder; separator-bearing and empty identities fail closed; byte-identical no-side-effect proof. Safe-slug derivation stays provisional (identity-as-slug) until journey profiles own it.
 
 ### FND-012 — Implement CLI parsing, stream separation, and exits
 
