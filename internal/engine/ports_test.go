@@ -335,3 +335,100 @@ func TestFileFactRejectsUnknownKind(t *testing.T) {
 		t.Fatalf("unknown file kind error = %v", err)
 	}
 }
+
+func TestDirEntryRejectsInvalidNames(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"", ".", "..", "a/b", `a\b`, "work.yaml/"} {
+		if _, err := engine.NewDirEntry(engine.DirEntryInput{Name: name, Kind: engine.FileKindRegular}); !errors.Is(err, engine.ErrInvalidProtocolValue) {
+			t.Fatalf("invalid entry name %q error = %v", name, err)
+		}
+	}
+	entry, err := engine.NewDirEntry(engine.DirEntryInput{Name: "work.yaml", Kind: engine.FileKindRegular})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry.Name() != "work.yaml" || entry.Kind() != engine.FileKindRegular {
+		t.Fatalf("entry accessors lost input: %#v", entry)
+	}
+}
+
+func TestListDirIsSortedAndFaultable(t *testing.T) {
+	t.Parallel()
+
+	fake := testkit.NewMemFileFacts(map[string]testkit.MemFile{
+		"/repo/.sdd/work/zebra/work.yaml": {Bytes: []byte("z\n")},
+		"/repo/.sdd/work/apple/work.yaml": {Bytes: []byte("a\n")},
+		"/repo/.sdd/workspace.yaml":       {Bytes: []byte("w\n")},
+		"/repo/.sdd/work":                 {Kind: engine.FileKindDirectory},
+	})
+
+	entries, err := fake.ListDir(context.Background(), "/repo/.sdd/work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 || entries[0].Name() != "apple" || entries[1].Name() != "zebra" {
+		t.Fatalf("children are not sorted: %v", entries)
+	}
+	for _, entry := range entries {
+		if entry.Kind() != engine.FileKindDirectory {
+			t.Fatalf("nested work dir reported as %q", entry.Kind())
+		}
+	}
+
+	top, err := fake.ListDir(context.Background(), "/repo/.sdd")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(top) != 2 || top[0].Name() != "work" || top[1].Name() != "workspace.yaml" {
+		t.Fatalf("top-level children are wrong: %v", top)
+	}
+
+	if _, err := fake.ListDir(context.Background(), "/repo/.sdd/workspace.yaml"); !errors.Is(err, engine.ErrDependencyFault) {
+		t.Fatalf("file list error = %v", err)
+	}
+	if _, err := fake.ListDir(context.Background(), "/repo/absent"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing list error = %v", err)
+	}
+	if _, err := fake.ListDir(context.Background(), ""); !errors.Is(err, engine.ErrInvalidProtocolValue) {
+		t.Fatalf("empty list path error = %v", err)
+	}
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := fake.ListDir(cancelled, "/repo/.sdd"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled list did not short-circuit: %v", err)
+	}
+	injected := errors.New("readdir fault")
+	fake.InjectFault("/repo/.sdd", injected)
+	if _, err := fake.ListDir(context.Background(), "/repo/.sdd"); !errors.Is(err, injected) {
+		t.Fatalf("injected list fault did not propagate: %v", err)
+	}
+}
+
+func TestOSListDirReadsNativeDirectory(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "b-dir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "a-file"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	native := engine.OSFileFacts{}
+	entries, err := native.ListDir(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 || entries[0].Name() != "a-file" || entries[0].Kind() != engine.FileKindRegular ||
+		entries[1].Name() != "b-dir" || entries[1].Kind() != engine.FileKindDirectory {
+		t.Fatalf("native children are wrong: %v", entries)
+	}
+	if _, err := native.ListDir(context.Background(), filepath.Join(root, "absent")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing native list error = %v", err)
+	}
+	if _, err := native.ListDir(context.Background(), filepath.Join(root, "a-file")); !errors.Is(err, engine.ErrDependencyFault) {
+		t.Fatalf("file native list error = %v", err)
+	}
+}

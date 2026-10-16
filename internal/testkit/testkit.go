@@ -13,7 +13,9 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -233,6 +235,78 @@ func (m *MemFileFacts) ReadFile(ctx context.Context, abspath string) ([]byte, er
 		}
 	}
 	return append([]byte{}, file.Bytes...), nil
+}
+
+// ListDir returns the immediate children of path in sorted name order. A
+// recorded path with further components beneath it is reported as a
+// directory; an explicitly recorded directory entry keeps its kind. Unknown
+// paths fail with an os.ErrNotExist-compatible error.
+func (m *MemFileFacts) ListDir(ctx context.Context, abspath string) ([]engine.DirEntry, error) {
+	if abspath == "" {
+		return nil, fmt.Errorf("%w: filesystem path is required", engine.ErrInvalidProtocolValue)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if fault, hasFault := m.faults[abspath]; hasFault {
+		return nil, fault
+	}
+	prefix := abspath + "/"
+	children := map[string]engine.FileKind{}
+	known := false
+	for recorded, file := range m.files {
+		if recorded == abspath {
+			known = true
+			if file.Kind == engine.FileKindDirectory {
+				continue
+			}
+			return nil, fmt.Errorf("%w: list directory facts on a non-directory", engine.ErrDependencyFault)
+		}
+		rest, ok := cutPrefix(recorded, prefix)
+		if !ok {
+			continue
+		}
+		known = true
+		name, _, hasMore := splitComponent(rest)
+		kind := file.Kind
+		if hasMore {
+			kind = engine.FileKindDirectory
+		}
+		if current, seen := children[name]; !seen || (current != engine.FileKindDirectory && kind == engine.FileKindDirectory) {
+			children[name] = kind
+		}
+	}
+	if !known {
+		return nil, fmt.Errorf("list directory facts: %w", fs.ErrNotExist)
+	}
+	names := slices.Sorted(maps.Keys(children))
+	entries := make([]engine.DirEntry, 0, len(names))
+	for _, name := range names {
+		entry, err := engine.NewDirEntry(engine.DirEntryInput{Name: name, Kind: children[name]})
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
+}
+
+func cutPrefix(recorded, prefix string) (string, bool) {
+	if len(recorded) <= len(prefix) || recorded[:len(prefix)] != prefix {
+		return "", false
+	}
+	return recorded[len(prefix):], true
+}
+
+func splitComponent(rest string) (name, remainder string, hasMore bool) {
+	for i := 0; i < len(rest); i++ {
+		if rest[i] == '/' {
+			return rest[:i], rest[i+1:], true
+		}
+	}
+	return rest, "", false
 }
 
 // NewFixedPolicySnapshotter returns a snapshotter serving a copy of the

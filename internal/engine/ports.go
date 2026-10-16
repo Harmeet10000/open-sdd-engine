@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"slices"
+	"strings"
 	"time"
 
 	"sdd.dev/sdd/internal/workspace"
@@ -182,7 +184,40 @@ func (f FileFact) ModTime() time.Time { return f.modTime }
 type FileFacts interface {
 	Stat(ctx context.Context, abspath string) (FileFact, error)
 	ReadFile(ctx context.Context, abspath string) ([]byte, error)
+	// ListDir returns the immediate children of abspath in byte-sorted
+	// name order so traversal is deterministic on every platform.
+	ListDir(ctx context.Context, abspath string) ([]DirEntry, error)
 }
+
+// DirEntry is one immediate child observed by ListDir. Name is a single
+// path component, never a path with separators.
+type DirEntry struct {
+	name string
+	kind FileKind
+}
+
+// DirEntryInput constructs a DirEntry.
+type DirEntryInput struct {
+	Name string
+	Kind FileKind
+}
+
+// NewDirEntry rejects empty names, dot components, separators, and unknown kinds.
+func NewDirEntry(input DirEntryInput) (DirEntry, error) {
+	if input.Name == "" || input.Name == "." || input.Name == ".." || strings.ContainsAny(input.Name, `/\`) {
+		return DirEntry{}, fmt.Errorf("%w: invalid directory entry name %q", ErrInvalidProtocolValue, input.Name)
+	}
+	if !input.Kind.valid() {
+		return DirEntry{}, fmt.Errorf("%w: unsupported file kind %q", ErrInvalidProtocolValue, input.Kind)
+	}
+	return DirEntry{name: input.Name, kind: input.Kind}, nil
+}
+
+// Name reports the single-component child name.
+func (e DirEntry) Name() string { return e.name }
+
+// Kind reports the observed child shape.
+func (e DirEntry) Kind() FileKind { return e.kind }
 
 // OSFileFacts is the production FileFacts adapter over the host filesystem.
 type OSFileFacts struct{}
@@ -227,6 +262,43 @@ func (OSFileFacts) ReadFile(ctx context.Context, abspath string) ([]byte, error)
 		return nil, errors.Join(ErrDependencyFault, fmt.Errorf("read file facts: %w", err))
 	}
 	return content, nil
+}
+
+// ListDir returns the immediate children of abspath in sorted name order.
+// A missing path fails with an os.ErrNotExist-compatible error, matching
+// Stat behavior; a non-directory path fails with a dependency fault.
+func (OSFileFacts) ListDir(ctx context.Context, abspath string) ([]DirEntry, error) {
+	if abspath == "" {
+		return nil, fmt.Errorf("%w: filesystem path is required", ErrInvalidProtocolValue)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	// #nosec G304 -- absolute-path reads are the port contract; containment and
+	// traversal policy belong to workspace transactions and bounded execution.
+	infos, err := os.ReadDir(abspath)
+	if err != nil {
+		return nil, errors.Join(ErrDependencyFault, fmt.Errorf("list directory facts: %w", err))
+	}
+	entries := make([]DirEntry, 0, len(infos))
+	for _, info := range infos {
+		var kind FileKind
+		switch {
+		case info.IsDir():
+			kind = FileKindDirectory
+		case info.Type().IsRegular():
+			kind = FileKindRegular
+		default:
+			kind = FileKindOther
+		}
+		entry, err := NewDirEntry(DirEntryInput{Name: info.Name(), Kind: kind})
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	slices.SortFunc(entries, func(a, b DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
+	return entries, nil
 }
 
 func classifyFileInfo(info fs.FileInfo) FileKind {
