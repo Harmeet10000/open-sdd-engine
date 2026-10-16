@@ -15,6 +15,10 @@ func TestHelpNamesOnlyImplementedCommands(t *testing.T) {
 		if !strings.Contains(text, command) {
 			t.Fatalf("help text does not name %q", command)
 		}
+		topic, ok := help.Topic(command)
+		if !ok || !strings.Contains(topic, "Usage:") {
+			t.Fatalf("command %q lacks a usage topic", command)
+		}
 	}
 	if strings.Contains(text, "\x1b[") {
 		t.Fatal("help text contains ANSI escapes")

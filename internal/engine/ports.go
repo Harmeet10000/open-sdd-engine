@@ -121,6 +121,32 @@ type PolicySnapshotter interface {
 	PolicySnapshot(ctx context.Context) (PolicySnapshot, error)
 }
 
+// LocalDevelopmentPolicySource names the only policy source a local CLI run
+// can observe without a trusted distribution channel (DEC-01). It confers
+// no organization authority and attests nothing beyond the local run.
+const LocalDevelopmentPolicySource = "local-development"
+
+const localDevelopmentPolicyFloor = "policy-floor: local-development/1\n"
+
+// LocalPolicy observes the fixed local-development floor. Doctor reports its
+// source; dry-run binds its digest. Trusted organization policy arrives with
+// the policy integration the company decisions unblock, not by upgrading
+// these bytes in place.
+func LocalPolicy() PolicySnapshotter { return localPolicySnapshotter{} }
+
+type localPolicySnapshotter struct{}
+
+// PolicySnapshot returns the fixed local-development observation.
+func (localPolicySnapshotter) PolicySnapshot(ctx context.Context) (PolicySnapshot, error) {
+	if err := ctx.Err(); err != nil {
+		return PolicySnapshot{}, err
+	}
+	return NewPolicySnapshot(PolicySnapshotInput{
+		Source: LocalDevelopmentPolicySource,
+		Floor:  []byte(localDevelopmentPolicyFloor),
+	})
+}
+
 // FileKind distinguishes the raw filesystem facts the engine may observe.
 // It is deliberately narrower than workspace.FileKind: layout discovery needs
 // shape, not durable identity.
