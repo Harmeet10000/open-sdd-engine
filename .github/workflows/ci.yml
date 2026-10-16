@@ -4,19 +4,52 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GOFLAGS: -mod=readonly
+
 jobs:
-  go-verify:
-    name: Go verify
+  contribution-policy:
+    name: Contribution policy
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Validate pull-request title
+        env:
+          COMMIT_MESSAGE: ${{ github.event.pull_request.title }}
+        run: go run ./internal/tools/commitlint -message "$COMMIT_MESSAGE"
+
+      - name: Validate commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: go run ./internal/tools/commitlint -base "$BASE_SHA" -head "$HEAD_SHA"
+
+  source-quality:
+    name: Source quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -24,63 +57,143 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: 1.24.x
-          check-latest: true
-          cache: false
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
 
-      - name: Verify
-        run: make verify
+      - name: Check formatting
+        run: make fmt-check
 
-  static-analysis:
-    name: Static analysis
+      - name: Check module integrity
+        run: make mod-check
+
+      - name: Resolve package graph
+        run: make list
+
+      - name: Vet packages
+        run: make vet
+
+      - name: Install workflow validator
+        env:
+          GOFLAGS: -mod=mod
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      - name: Validate workflows
+        run: make actionlint
+
+  test:
+    name: Test (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.24.x", "1.27.2"]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Analysis tools follow the current Go export-data format independently
-      # of the module's minimum supported Go version in go.mod.
-      - name: Set up analysis toolchain
+      - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: 1.27.x
-          check-latest: true
-          cache: false
+          go-version: ${{ matrix.go }}
+          cache: true
+          cache-dependency-path: go.sum
 
-      - name: Install pinned analysis tools
-        env:
-          GOFLAGS: -mod=mod
-        run: go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
+      - name: Test
+        run: make test-current
 
-      - name: Static analysis
-        env:
-          GOFLAGS: -mod=readonly
-        run: staticcheck ./...
-
-  vulnerability-scan:
-    name: Reachable vulnerability scan
-    runs-on: ubuntu-latest
+  platform-test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # govulncheck v1.1.4 predates Go 1.27 export data. Keep the scanner on
-      # the newest patch of the module's supported 1.24 toolchain.
-      - name: Set up vulnerability-analysis toolchain
+      - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: 1.24.x
-          check-latest: true
-          cache: false
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
 
-      - name: Install pinned vulnerability scanner
-        env:
-          GOFLAGS: -mod=mod
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+      - name: Test
+        run: go test -count=1 -shuffle=on ./...
 
-      - name: Reachable vulnerability scan
+  race-and-coverage:
+    name: Race and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Race detector
+        run: make race
+
+      - name: Coverage threshold
+        run: make coverage
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@d583c34f0599d37dbac4a198b9c83201be380893 # v9.3.0
+        with:
+          version: v2.14.0
+          args: --timeout=5m
+
+  required:
+    name: Required checks
+    if: always()
+    needs:
+      - contribution-policy
+      - source-quality
+      - test
+      - platform-test
+      - race-and-coverage
+      - lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm required jobs passed
         env:
-          GOFLAGS: -mod=readonly
-        run: govulncheck ./...
+          POLICY_RESULT: ${{ needs.contribution-policy.result }}
+          SOURCE_RESULT: ${{ needs.source-quality.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          PLATFORM_RESULT: ${{ needs.platform-test.result }}
+          RACE_RESULT: ${{ needs.race-and-coverage.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+        run: |
+          if [[ "$POLICY_RESULT" != "success" && "$POLICY_RESULT" != "skipped" ]]; then
+            exit 1
+          fi
+          [[ "$SOURCE_RESULT" == "success" ]]
+          [[ "$TEST_RESULT" == "success" ]]
+          [[ "$PLATFORM_RESULT" == "success" ]]
+          [[ "$RACE_RESULT" == "success" ]]
+          [[ "$LINT_RESULT" == "success" ]]
