@@ -28,11 +28,12 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-003 — Define immutable protocol types and outcome renderer seam
 
-- [ ] FND-003 — Define immutable protocol types and outcome renderer seam
+- [x] FND-003 — Define immutable protocol types and outcome renderer seam
 - **Requirements:** REQ-002, REQ-003, REQ-008
 - **Depends on:** [FND-002]
 - Implement typed command/result/outcome/diagnostic/next-action values and one renderer input. Preserve empty arrays and declared result nullability. Add redaction and renderer write-error paths.
 - **Done when:** human and JSON views derive from one outcome and schema fixtures validate both.
+- **Completed (2026-10-16):** `internal/engine` materializes the closed immutable protocol model (commands, four result variants, outcome, diagnostics, next-actions, digests) with defensive copies and schema-exact JSON; `internal/presentation/render` provides the single redacting `Input` seam with human/JSON renderers and write-error propagation. Executable tests cover all constructor/validation branches, redaction of every result variant, and Draft-07 conformance of all five rendered outcome kinds (status, version, doctor, unknown, start-dry-run).
 
 ### FND-004 — Build deterministic dependency ports
 
