@@ -304,10 +304,18 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return e.fail(cmd, ctxErr)
 	}
-	// The slug is display data; FND-011 owns safe-slug derivation. Until
-	// then the immutable work ID doubles as a valid slug so the preview
-	// record decodes under the engine's own strict rules.
+	if planID == "" || workID == "" {
+		return e.fail(cmd, fmt.Errorf("%w: identity source minted an empty ID", errAssemble))
+	}
+	// The slug is display data; safe-slug derivation arrives with journey
+	// profiles. Until then the immutable work ID doubles as a valid slug so
+	// the preview record decodes under the engine's own strict rules. IDs
+	// containing path separators are rejected instead of sanitized: silent
+	// rewriting could collide two identities into one directory.
 	slug := workID
+	if strings.ContainsAny(slug, `/\`) {
+		return e.fail(cmd, fmt.Errorf("%w: derived slug is not a safe path component", errAssemble))
+	}
 	path := ".sdd/work/" + slug + "/work.yaml"
 	composition := cmd.Workflow()
 	if composition == "" {
@@ -388,12 +396,26 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 		Message:  "Preview only; durable application is not implemented in foundation",
 		Source:   source,
 	})
+	// The preview carries the verification step a future applier needs:
+	// re-observe this work item and compare revisions before applying, so a
+	// stale preview can never authorize changed state.
+	revision := layout.Revision()
+	verify, verifyErr := NewNextAction(NextActionInput{
+		Command:          "status",
+		Flags:            map[string]FlagValue{"work": StringFlag(workID)},
+		Reason:           "Verify the previewed work item before any future application",
+		ExpectedRevision: &revision,
+	})
+	if verifyErr != nil {
+		return e.fail(cmd, fmt.Errorf("%w: dry-run next action: %w", errAssemble, verifyErr))
+	}
 	workspace := workspaceRefOf(layout)
 	outcome, err := NewOutcome(OutcomeInput{
 		Command:     cmd.Kind(),
 		Workspace:   &workspace,
 		Result:      &result,
 		Diagnostics: []Diagnostic{preview},
+		NextActions: []NextAction{verify},
 		ExitCode:    ExitSuccess,
 	})
 	if err != nil {
@@ -471,7 +493,7 @@ type failureMapping struct {
 // mapFailure renders one error into its stable diagnostic shape. The mapping
 // is total: observation-path faults land in the workspace family and
 // residual assembly faults land in the schema family, both exit 3 with a
-// truthful message. A future DIAG_INTERNAL_ERROR extension may narrow the
+// truthful message. A future internal-error extension may narrow the
 // residual default; the messages and exit family are already stable.
 func mapFailure(err error) mappedDiagnostic {
 	mapping, message, metadata, next := classifyFailure(err)
