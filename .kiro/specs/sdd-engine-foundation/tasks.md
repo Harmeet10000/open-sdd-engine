@@ -55,11 +55,12 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-006 — Implement typed canonicalization and digest set
 
-- [ ] FND-006 — Implement typed canonicalization and digest set
+- [x] FND-006 — Implement typed canonicalization and digest set
 - **Requirements:** REQ-002, REQ-007, REQ-017
 - **Depends on:** [FND-005]
 - Compute versioned blob, semantic, and derivation digests; bind workflow/policy/validator definition bytes, not names. Preserve meaningful Markdown whitespace/code/order and invalidate unknown meaning conservatively.
 - **Done when:** formatting-only and behavior-changing fixtures demonstrate the intended digest distinctions, including dirty working content not represented by Git HEAD.
+- **Completed (2026-10-17):** `internal/engine/digest.go` implements the AM-04-narrowed foundation digest set: domain-separated blob digests, work-record/workspace semantic digests, upstream-binding derivation digests, and `ComputePlanDigest`/`VerifyPlanDigest` over every decision-bearing plan field with ordered effects. Fixtures prove formatting-only stability vs behavior-change invalidation, stale-digest rejection, and git-independent dirty-byte binding. Generic artifact canonicalization stays with artifact-validation.
 
 ### FND-007 — Implement Engine.Execute error/cancellation rail
 
