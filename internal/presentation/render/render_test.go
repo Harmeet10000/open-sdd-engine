@@ -255,11 +255,11 @@ func TestRedactionCoversJSONCredentialForms(t *testing.T) {
 	diagnostic, err := engine.NewDiagnostic(engine.DiagnosticInput{
 		Code:     "DIAG_USAGE_ERROR",
 		Severity: engine.SeverityError,
-		Message:  `auth failed for {"token":"abc123"} with password="alpha beta"`,
+		Message:  `auth failed for {"token":"abc123"} with password="not a real credential"`,
 		Source:   source,
 		Metadata: map[string]any{
 			"/repo/token=hunter2": "path-label",
-			"password":            "s3cr3t-value",
+			"password":            "test-only-placeholder",
 			"nested":              map[string]any{"api_key": "qwerty"},
 		},
 	})
@@ -279,7 +279,7 @@ func TestRedactionCoversJSONCredentialForms(t *testing.T) {
 		t.Fatal(err)
 	}
 	rendered := jsonOut.String()
-	for _, leaked := range []string{"abc123", "alpha", "beta", "hunter2", "qwerty", "s3cr3t-value"} {
+	for _, leaked := range []string{"abc123", "not a real credential", "hunter2", "qwerty", "test-only-placeholder"} {
 		if strings.Contains(rendered, leaked) {
 			t.Fatalf("JSON credential form leaked %q: %s", leaked, rendered)
 		}
