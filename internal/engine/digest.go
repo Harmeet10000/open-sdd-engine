@@ -88,8 +88,9 @@ func DerivationDigest(domain, semantic string, upstream ...string) (string, erro
 
 // PlanDigestInput carries every decision-bearing plan field except the plan
 // digest itself. The digest binds identity, revision scope, all four
-// definition/input digests, ordered operations and preconditions, and the
-// idempotency key: any change requires a new authorization.
+// definition/input digests, ordered operations and preconditions, the
+// authorizable flag, and the idempotency key: any change requires a new
+// authorization.
 type PlanDigestInput struct {
 	PlanID                    string
 	WorkspaceID               string
@@ -103,6 +104,7 @@ type PlanDigestInput struct {
 	Operations                []PlanOperation
 	Preconditions             []PlanPrecondition
 	IdempotencyKey            string
+	Authorizable              bool
 }
 
 // ComputePlanDigest binds a dry-run plan's decision fields and ordered
@@ -115,14 +117,15 @@ func ComputePlanDigest(input PlanDigestInput) (string, error) {
 	if input.RevisionScope != RevisionWorkspace && input.RevisionScope != RevisionWork {
 		return "", fmt.Errorf("%w: unsupported revision scope %q", ErrInvalidProtocolValue, input.RevisionScope)
 	}
-	for name, digest := range map[string]string{
-		"input":                input.InputDigest,
-		"policy":               input.PolicyDigest,
-		"workflow definition":  input.WorkflowDefinitionDigest,
-		"validator definition": input.ValidatorDefinitionDigest,
-	} {
-		if !validDigest(digest) {
-			return "", fmt.Errorf("%w: %s digest is malformed", ErrInvalidProtocolValue, name)
+	digests := []struct{ name, value string }{
+		{"input", input.InputDigest},
+		{"policy", input.PolicyDigest},
+		{"workflow definition", input.WorkflowDefinitionDigest},
+		{"validator definition", input.ValidatorDefinitionDigest},
+	}
+	for _, digest := range digests {
+		if !validDigest(digest.value) {
+			return "", fmt.Errorf("%w: %s digest is malformed", ErrInvalidProtocolValue, digest.name)
 		}
 	}
 	if len(input.Operations) == 0 || len(input.Preconditions) == 0 {
@@ -162,6 +165,7 @@ func ComputePlanDigest(input PlanDigestInput) (string, error) {
 		writeDigestFrame(h, precondition.ExpectedDigest())
 	}
 	writeDigestFrame(h, input.IdempotencyKey)
+	writeDigestBool(h, input.Authorizable)
 	return formatDigest(h.Sum(nil)), nil
 }
 
@@ -182,6 +186,7 @@ func VerifyPlanDigest(plan MutationPlan) error {
 		Operations:                plan.Operations(),
 		Preconditions:             plan.Preconditions(),
 		IdempotencyKey:            plan.IdempotencyKey(),
+		Authorizable:              plan.Authorizable(),
 	})
 	if err != nil {
 		return err

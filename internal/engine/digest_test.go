@@ -191,7 +191,7 @@ func TestPlanDigestBindsEveryDecisionField(t *testing.T) {
 		WorkflowDefinitionDigest:  input.WorkflowDefinitionDigest,
 		ValidatorDefinitionDigest: input.ValidatorDefinitionDigest,
 		Operations:                input.Operations, Preconditions: input.Preconditions,
-		Digest: digest, IdempotencyKey: input.IdempotencyKey,
+		Digest: digest, IdempotencyKey: input.IdempotencyKey, Authorizable: input.Authorizable,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -216,6 +216,7 @@ func TestPlanDigestBindsEveryDecisionField(t *testing.T) {
 		"changed policy digest": func(in *engine.PlanDigestInput) { in.PolicyDigest = input.InputDigest },
 		"changed idempotency":   func(in *engine.PlanDigestInput) { in.IdempotencyKey = "idem-2" },
 		"changed work ID":       func(in *engine.PlanDigestInput) { in.WorkID = "work-2" },
+		"flipped authorizable":  func(in *engine.PlanDigestInput) { in.Authorizable = true },
 	}
 	for name, mutate := range mutations {
 		t.Run(name, func(t *testing.T) {
@@ -239,7 +240,7 @@ func TestPlanDigestBindsEveryDecisionField(t *testing.T) {
 				WorkflowDefinitionDigest:  changed.WorkflowDefinitionDigest,
 				ValidatorDefinitionDigest: changed.ValidatorDefinitionDigest,
 				Operations:                changed.Operations, Preconditions: changed.Preconditions,
-				Digest: digest, IdempotencyKey: changed.IdempotencyKey,
+				Digest: digest, IdempotencyKey: changed.IdempotencyKey, Authorizable: changed.Authorizable,
 			})
 			if err != nil {
 				t.Fatal(err)
