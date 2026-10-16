@@ -8,13 +8,14 @@
     "cwd": ".kiro workspace with .kiro/changes/export-api/proposal.md",
     "captured": "2026-10-17",
     "runner": "bun 1.4.2",
-    "note": "Source tree packages/cli/src cannot boot (missing ../memory/cognee.js); fixtures captured from the checked-in dist bundle, which is the shippable legacy artifact."
+    "note": "Source tree packages/cli/src cannot boot (missing ../memory/cognee.js); fixtures captured from the checked-in dist bundle, which is the shippable legacy artifact.",
+    "normalization": "Sandbox capture double-encoded UTF-8 (bundle bytes E2 80 94 observed as C3 A2 C2 80 C2 94); fields normalized back to the bundle's true UTF-8. Verified: normalized marks match the dist bundle's literal bytes."
   },
   "command": [
     "status"
   ],
   "stdin": "",
-  "stdout": "CHANGE export-api â phase: specs\n  â proposal\n  â specs\n  â design\n  â tasks\n",
+  "stdout": "CHANGE export-api — phase: specs\n  ✓ proposal\n  ○ specs\n  ○ design\n  ○ tasks\n",
   "stderr": "",
   "exitCode": 0,
   "schemaVersion": "legacy-typescript/1",

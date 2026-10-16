@@ -47,6 +47,17 @@ func loadLegacyFixtures(t *testing.T) map[string]legacyFixture {
 		if err != nil {
 			t.Fatal(err)
 		}
+		var raw map[string]any
+		if err := json.Unmarshal(content, &raw); err != nil {
+			t.Fatal(err)
+		}
+		// Presence checks run on the raw document: typed zero values
+		// cannot distinguish a missing field from an empty one.
+		for _, field := range []string{"name", "provenance", "command", "stdin", "stdout", "stderr", "exitCode", "schemaVersion", "intentionalDifferences"} {
+			if _, ok := raw[field]; !ok {
+				t.Fatalf("fixture %s lacks %q", name, field)
+			}
+		}
 		var fixture legacyFixture
 		if err := json.Unmarshal(content, &fixture); err != nil {
 			t.Fatal(err)
@@ -55,9 +66,24 @@ func loadLegacyFixtures(t *testing.T) map[string]legacyFixture {
 			len(fixture.IntentionalDifferences) == 0 || len(fixture.Provenance) == 0 {
 			t.Fatalf("fixture %s lacks command/stdin/stdout/stderr/exit/schema metadata", name)
 		}
+		assertInventoriedCommand(t, name, fixture.Command)
 		fixtures[fixture.Name] = fixture
 	}
 	return fixtures
+}
+
+// assertInventoriedCommand restricts parity to commands the legacy CLI
+// actually implements. A fixture file for doctor, start, or any other
+// new-contract command fails here, not in review.
+func assertInventoriedCommand(t *testing.T, name string, command []string) {
+	t.Helper()
+	if len(command) == 1 && command[0] == "--version" {
+		return
+	}
+	if len(command) > 0 && command[0] == "status" {
+		return
+	}
+	t.Fatalf("fixture %s claims parity for uninventoried command %q", name, command)
 }
 
 func runNew(t *testing.T, argv []string, workdir string) (stdout string, exit int) {
