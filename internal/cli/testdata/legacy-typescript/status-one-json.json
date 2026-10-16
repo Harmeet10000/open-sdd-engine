@@ -1,0 +1,26 @@
+{
+  "name": "status-one-json",
+  "provenance": {
+    "cli": "packages/cli/dist/cli.js",
+    "argv": [
+      "status",
+      "--json"
+    ],
+    "cwd": ".kiro workspace with .kiro/changes/export-api/proposal.md",
+    "captured": "2026-10-17",
+    "runner": "bun 1.4.2",
+    "note": "Source tree packages/cli/src cannot boot (missing ../memory/cognee.js); fixtures captured from the checked-in dist bundle, which is the shippable legacy artifact."
+  },
+  "command": [
+    "status",
+    "--json"
+  ],
+  "stdin": "",
+  "stdout": "{\n  \"items\": [\n    {\n      \"loop\": \"change\",\n      \"id\": \"export-api\",\n      \"artifacts\": {\n        \"proposal\": true,\n        \"specs\": false,\n        \"design\": false,\n        \"tasks\": false\n      },\n      \"phase\": \"specs\"\n    }\n  ]\n}\n",
+  "stderr": "",
+  "exitCode": 0,
+  "schemaVersion": "legacy-typescript/1",
+  "intentionalDifferences": [
+    "Legacy emits {loop, id, artifacts, phase}; new CLI emits the versioned status envelope. Shapes differ by design; item count agrees."
+  ]
+}
