@@ -20,7 +20,7 @@ jobs:
   contribution-policy:
     name: Contribution policy
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Check out complete history
@@ -48,7 +48,7 @@ jobs:
 
   source-quality:
     name: Source quality
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -83,7 +83,7 @@ jobs:
 
   test:
     name: Test (Go ${{ matrix.go }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -127,7 +127,7 @@ jobs:
 
   race-and-coverage:
     name: Race and coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check out repository
@@ -148,7 +148,7 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -177,7 +177,7 @@ jobs:
       - platform-test
       - race-and-coverage
       - lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
       - name: Confirm required jobs passed
