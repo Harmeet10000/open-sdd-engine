@@ -109,11 +109,12 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-012 — Implement CLI parsing, stream separation, and exits
 
-- [ ] FND-012 — Implement CLI parsing, stream separation, and exits
+- [x] FND-012 — Implement CLI parsing, stream separation, and exits
 - **Requirements:** REQ-008, REQ-009, REQ-011
 - **Depends on:** [FND-007, FND-008, FND-009, FND-010, FND-011]
 - Implement global flag semantics, non-interactive no-prompt behavior, concise usage failures, stdout/stderr separation, structured next actions, and stable exit mapping.
 - **Done when:** TTY, redirected, JSON, no-color, narrow-terminal, secret-redaction, and malformed-input fixtures pass without requiring prose parsing.
+- **Completed (2026-10-17):** `cmd/sdd` + `internal/cli` compose Cobra parsing (silenced, no `os.Exit` in handlers), signal-derived context, output-mode resolution, stdout/stderr separation, and engine exit codes. `--version`/`--help` short-circuit workspace-free; unknown input preserves its name; bare `start` fails closed with `--dry-run` guidance; credential patterns redact in both modes; no ANSI anywhere; cancellation exits 130. ADR-0005 admits Cobra without Viper (env/config layering deferred).
 
 ### FND-013 — Add migration parity harness
 

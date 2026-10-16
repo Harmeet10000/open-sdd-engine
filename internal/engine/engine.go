@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -80,6 +81,21 @@ func NewEngine(deps Dependencies) (*Engine, error) {
 		workdir: deps.Workdir,
 		build:   build,
 	}, nil
+}
+
+// UsageError reports a CLI-layer input failure (bad flags, missing
+// arguments, conflicting options) as a stable outcome. A zero command
+// normalizes to an unknown-command envelope; an identified command keeps
+// its attribution with a null result.
+func (e *Engine) UsageError(cmd Command, message string) Outcome {
+	return e.fail(cmd, fmt.Errorf("%w: %s", ErrInvalidProtocolValue, message))
+}
+
+// DevelopmentBuild is the fixed dev-build identity used when no linker
+// metadata was injected. Values are reproducible literals, never wall-clock
+// time, so local builds stay byte-comparable.
+func DevelopmentBuild() BuildMetadata {
+	return BuildMetadata{Version: "0.1.0-dev", Commit: "unknown", BuildTime: "unknown", GoVersion: runtime.Version()}
 }
 
 // UnknownCommand reports unparseable CLI input without trusting it as a
