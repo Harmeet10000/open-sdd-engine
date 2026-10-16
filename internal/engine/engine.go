@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // errPolicySource marks a failure to observe required policy. It maps to a
@@ -64,12 +67,18 @@ func NewEngine(deps Dependencies) (*Engine, error) {
 	if strings.TrimSpace(deps.Build.Version) == "" {
 		return nil, fmt.Errorf("%w: build version is required", ErrInvalidProtocolValue)
 	}
+	buildInputs := make(map[string]string, len(deps.Build.BuildInputs))
+	for key, value := range deps.Build.BuildInputs {
+		buildInputs[key] = value
+	}
+	build := deps.Build
+	build.BuildInputs = buildInputs
 	return &Engine{
 		facts:   deps.Facts,
 		ids:     deps.IDs,
 		policy:  deps.Policy,
 		workdir: deps.Workdir,
-		build:   deps.Build,
+		build:   build,
 	}, nil
 }
 
@@ -123,8 +132,8 @@ func (e *Engine) Execute(ctx context.Context, cmd Command) Outcome {
 }
 
 func (e *Engine) version(ctx context.Context, cmd Command) Outcome {
-	if err := ctx.Err(); err != nil {
-		return e.fail(cmd, err)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return e.fail(cmd, ctxErr)
 	}
 	buildInputs := make(map[string]string, len(e.build.BuildInputs))
 	for key, value := range e.build.BuildInputs {
@@ -180,6 +189,9 @@ func (e *Engine) doctor(ctx context.Context, cmd Command) Outcome {
 		record("workspace", false, "workspace discovery failed")
 		return e.doctorFailure(cmd, checks, err)
 	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return e.fail(cmd, ctxErr)
+	}
 	record("workspace", true, layout.WorkspaceID())
 	record("schema", true, "1.0")
 
@@ -190,6 +202,9 @@ func (e *Engine) doctor(ctx context.Context, cmd Command) Outcome {
 		}
 		record("policy", false, "required policy source is unavailable")
 		return e.doctorFailure(cmd, checks, fmt.Errorf("%w: %w", errPolicySource, err))
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return e.fail(cmd, ctxErr)
 	}
 	record("policy", true, policy.Source())
 
@@ -272,13 +287,22 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 		}
 		return e.fail(cmd, fmt.Errorf("%w: %w", errPolicySource, err))
 	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return e.fail(cmd, ctxErr)
+	}
 	planID, err := e.ids.NewID()
 	if err != nil {
 		return e.fail(cmd, err)
 	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return e.fail(cmd, ctxErr)
+	}
 	workID, err := e.ids.NewID()
 	if err != nil {
 		return e.fail(cmd, err)
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return e.fail(cmd, ctxErr)
 	}
 	// The slug is display data; FND-011 owns safe-slug derivation. Until
 	// then the immutable work ID doubles as a valid slug so the preview
@@ -289,9 +313,23 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 	if composition == "" {
 		composition = "unspecified"
 	}
-	content := "schemaVersion: 1\nworkId: " + workID + "\nslug: " + slug +
-		"\nrevision: 0\nstatus: active\ncomposition: " + composition + "\n"
-	contentDigest := BlobDigest("sdd.raw-blob/1", []byte(content))
+	// Proposed bytes are marshaled, never concatenated: workflow text may
+	// contain YAML-significant characters (quotes, colons, comments) that
+	// string building would corrupt into an undecodable record.
+	zero := uint64(0)
+	contentBytes, err := yaml.Marshal(workManifest{
+		SchemaVersion: 1,
+		WorkID:        workID,
+		Slug:          slug,
+		Revision:      &zero,
+		Status:        "active",
+		Composition:   composition,
+	})
+	if err != nil {
+		return e.fail(cmd, fmt.Errorf("%w: dry-run content: %w", errAssemble, err))
+	}
+	content := string(contentBytes)
+	contentDigest := BlobDigest("sdd.raw-blob/1", contentBytes)
 	operation, err := NewPlanOperation(PlanOperationInput{
 		Kind:             OperationCreateFile,
 		Path:             path,
@@ -369,10 +407,15 @@ func (e *Engine) discoverFor(ctx context.Context, cmd Command) (Layout, error) {
 		return Layout{}, err
 	}
 	root := e.workdir
+	explicit := ""
 	if cmd.Root() != "" {
 		root = cmd.Root()
+		if !filepath.IsAbs(root) {
+			root = filepath.Join(e.workdir, root)
+		}
+		explicit = root
 	}
-	return DiscoverLayout(ctx, e.facts, root, cmd.Root())
+	return DiscoverLayout(ctx, e.facts, root, explicit)
 }
 
 func workspaceRefOf(layout Layout) WorkspaceRef {

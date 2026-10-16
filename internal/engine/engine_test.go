@@ -368,6 +368,128 @@ func TestNewEngineRejectsIncompleteDependencies(t *testing.T) {
 	}
 }
 
+func TestExecuteRelativeRootResolvesAgainstWorkdir(t *testing.T) {
+	t.Parallel()
+
+	facts := testkit.NewMemFileFacts(map[string]testkit.MemFile{
+		"/repo/sub/.sdd/workspace.yaml":       {Bytes: []byte(discoveryWorkspace)},
+		"/repo/sub/.sdd/work/apple/work.yaml": {Bytes: []byte(discoveryWorkApple)},
+	})
+	policy, err := engine.NewPolicySnapshot(engine.PolicySnapshotInput{Source: "test-policy", Floor: []byte("floor: strict\n")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng, err := engine.NewEngine(engine.Dependencies{
+		Facts:   facts,
+		IDs:     testkit.NewSequenceIDSource("work"),
+		Policy:  testkit.NewFixedPolicySnapshotter(policy),
+		Workdir: "/repo",
+		Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcome := eng.Execute(context.Background(), engine.NewStatusCommand("", "sub"))
+	if !outcome.OK() {
+		t.Fatalf("relative root did not resolve against workdir: %#v", outcomeDiagnostic(t, outcome))
+	}
+	if outcome.Workspace().Root() != "/repo/sub" {
+		t.Fatalf("relative root workspace = %q", outcome.Workspace().Root())
+	}
+}
+
+type blockingPolicy struct {
+	entered chan struct{}
+}
+
+func (b blockingPolicy) PolicySnapshot(ctx context.Context) (engine.PolicySnapshot, error) {
+	close(b.entered)
+	<-ctx.Done()
+	return engine.PolicySnapshot{}, ctx.Err()
+}
+
+func TestExecuteCancelledDryRunNeverSucceeds(t *testing.T) {
+	t.Parallel()
+
+	policy := blockingPolicy{entered: make(chan struct{})}
+	eng, err := engine.NewEngine(engine.Dependencies{
+		Facts:   testkit.NewMemFileFacts(validLayoutFiles()),
+		IDs:     testkit.NewSequenceIDSource("work"),
+		Policy:  policy,
+		Workdir: "/repo",
+		Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan engine.Outcome, 1)
+	go func() { done <- eng.Execute(ctx, mustStart(t)) }()
+	<-policy.entered
+	cancel()
+	outcome := <-done
+	if outcome.OK() || outcome.ExitCode() != engine.ExitInterrupted {
+		t.Fatalf("cancelled dry-run reported success: %#v", outcome)
+	}
+}
+
+func TestExecuteDryRunQuotesHostileWorkflow(t *testing.T) {
+	t.Parallel()
+
+	eng := executeEngine(t, validLayoutFiles())
+	for _, workflow := range []string{"#comment", "a: b", `qu"ote`, "it's"} {
+		start, err := engine.NewStartDryRunCommand("intent", workflow, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		outcome := eng.Execute(context.Background(), start)
+		if !outcome.OK() {
+			t.Fatalf("workflow %q dry-run: %#v", workflow, outcomeDiagnostic(t, outcome))
+		}
+		result := outcome.Result()
+		dryRun, _ := result.StartDryRun()
+		content := dryRun.Plan().Operations()[0].Content()
+		if content == nil {
+			t.Fatalf("workflow %q plan lacks content", workflow)
+		}
+		parsed, err := engine.DiscoverLayout(context.Background(), testkit.NewMemFileFacts(map[string]testkit.MemFile{
+			"/preview/.sdd/workspace.yaml":                                  {Bytes: []byte(discoveryWorkspace)},
+			("/preview/.sdd/work/" + dryRun.Plan().WorkID() + "/work.yaml"): {Bytes: []byte(*content)},
+		}), "/preview", "")
+		if err != nil {
+			t.Fatalf("workflow %q content failed strict decode: %v", workflow, err)
+		}
+		if parsed.Works()[0].Composition() != workflow {
+			t.Fatalf("workflow %q not preserved: %q", workflow, parsed.Works()[0].Composition())
+		}
+	}
+}
+
+func TestNewEngineIsolatesBuildInputs(t *testing.T) {
+	t.Parallel()
+
+	inputs := map[string]string{"epoch": "0"}
+	policy, err := engine.NewPolicySnapshot(engine.PolicySnapshotInput{Source: "test-policy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng, err := engine.NewEngine(engine.Dependencies{
+		Facts:   testkit.NewMemFileFacts(nil),
+		IDs:     testkit.NewSequenceIDSource("work"),
+		Policy:  testkit.NewFixedPolicySnapshotter(policy),
+		Workdir: "/repo",
+		Build:   engine.BuildMetadata{Version: "0.1.0-dev", BuildInputs: inputs},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs["epoch"] = "99"
+	version, _ := eng.Execute(context.Background(), engine.NewVersionCommand()).Result().Version()
+	if version.BuildInputs()["epoch"] != "0" {
+		t.Fatal("engine aliases caller build inputs")
+	}
+}
+
 func mustStart(t *testing.T) engine.Command {
 	t.Helper()
 	start, err := engine.NewStartDryRunCommand("add export", "quick-spec", "")
