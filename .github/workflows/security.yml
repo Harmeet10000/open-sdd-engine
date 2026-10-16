@@ -21,7 +21,7 @@ env:
 jobs:
   govulncheck:
     name: Reachable vulnerabilities
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -44,7 +44,7 @@ jobs:
 
   gosec:
     name: Source security
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -71,7 +71,7 @@ jobs:
     needs:
       - govulncheck
       - gosec
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
       - name: Confirm security jobs passed

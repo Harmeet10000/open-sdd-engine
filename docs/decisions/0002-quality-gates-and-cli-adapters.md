@@ -41,7 +41,9 @@ database. CI and a weekly scheduled workflow always execute it.
 
 Tool versions are pinned in the Makefile and workflows. Third-party GitHub
 Actions are pinned to full commit SHAs. Workflows receive read-only repository
-permissions unless a future job documents why it needs more.
+permissions unless a future job documents why it needs more. Linux jobs pin
+the Ubuntu 24.04 runner generation so a moving `ubuntu-latest` alias cannot
+silently change the protected build environment.
 
 ### CI validates compatibility, not only the maintainer's machine
 
