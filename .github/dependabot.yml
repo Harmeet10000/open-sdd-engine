@@ -9,6 +9,19 @@ updates:
       time: "04:00"
       timezone: Asia/Kolkata
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      go-production:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      go-development:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: npm
     directory: /
@@ -18,6 +31,8 @@ updates:
       time: "04:15"
       timezone: Asia/Kolkata
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
     groups:
       prototype-development:
         dependency-type: development
@@ -33,3 +48,9 @@ updates:
       time: "04:30"
       timezone: Asia/Kolkata
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns:
+          - "*"

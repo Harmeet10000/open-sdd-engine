@@ -1,0 +1,83 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOFLAGS: -mod=readonly
+
+jobs:
+  govulncheck:
+    name: Reachable vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install govulncheck
+        env:
+          GOFLAGS: -mod=mod
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+
+      - name: Scan reachable call paths
+        run: make vuln
+
+  gosec:
+    name: Source security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install gosec
+        env:
+          GOFLAGS: -mod=mod
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+
+      - name: Scan source
+        run: make security
+
+  required:
+    name: Security checks
+    if: always()
+    needs:
+      - govulncheck
+      - gosec
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm security jobs passed
+        env:
+          VULN_RESULT: ${{ needs.govulncheck.result }}
+          GOSEC_RESULT: ${{ needs.gosec.result }}
+        run: |
+          [[ "$VULN_RESULT" == "success" ]]
+          [[ "$GOSEC_RESULT" == "success" ]]

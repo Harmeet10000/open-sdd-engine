@@ -108,7 +108,7 @@ type SnapshotRequest struct {
 type WorkspaceObservation struct {
 	WorkspaceID   string
 	CanonicalRoot string
-	FormatVersion int
+	FormatVersion uint64
 	Revision      uint64
 }
 
@@ -267,7 +267,7 @@ func acceptCapture(request SnapshotRequest, capture Capture) (Snapshot, error) {
 	if capture.SnapshotID == "" || capture.Workspace.WorkspaceID != request.Selection.WorkspaceID {
 		return Snapshot{}, fmt.Errorf("%w: capture identity does not match selection", ErrSnapshotInvalid)
 	}
-	if capture.Workspace.FormatVersion < 1 || capture.Workspace.CanonicalRoot == "" {
+	if capture.Workspace.FormatVersion == 0 || capture.Workspace.CanonicalRoot == "" {
 		return Snapshot{}, fmt.Errorf("%w: workspace observation is incomplete", ErrSnapshotInvalid)
 	}
 	if err := validateSelectedWork(request.Selection, capture.Work); err != nil {
@@ -452,7 +452,7 @@ func digestReadSet(snapshot Snapshot) Digest {
 	h := sha256.New()
 	writeFramed(h, "sdd.raw-read-set/1")
 	writeFramed(h, snapshot.Workspace.WorkspaceID)
-	writeUint64(h, uint64(snapshot.Workspace.FormatVersion))
+	writeUint64(h, snapshot.Workspace.FormatVersion)
 	writeUint64(h, snapshot.Workspace.Revision)
 	if snapshot.Work != nil {
 		writeFramed(h, snapshot.Work.WorkID)

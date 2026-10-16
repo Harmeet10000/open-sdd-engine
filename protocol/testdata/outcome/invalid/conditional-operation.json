@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0",
+  "command": "start",
+  "ok": true,
+  "workspace": {"root": "/repo", "formatVersion": 1},
+  "work": null,
+  "result": {
+    "kind": "start-dry-run",
+    "plan": {
+      "planId": "plan-1",
+      "workspaceId": "ws-1",
+      "workId": "work-1",
+      "revisionScope": "workspace",
+      "expectedRevision": 4,
+      "inputDigest": "sha256:b727d8da7e2cbd385d9e474234dda18a9677913b37f40a8074b410d2efbce58c",
+      "policyDigest": "sha256:6d96b4f675f734210734c22f9d1f78eb21ee03316fe04068cf64f1ebdf97f3a6",
+      "workflowDefinitionDigest": "sha256:44e103af0242e49bc680a1ee30f96c847814cdf79401b1f6f10b1b7275bc623d",
+      "validatorDefinitionDigest": "sha256:e25d7eb5474afb9a12bf09813d869079e847bf64c9d79c12b68939870af944a6",
+      "operations": [
+        {
+          "kind": "update-file",
+          "path": ".sdd/work/example/work.yaml",
+          "expectedRevision": 4,
+          "content": "workId: work-1\n",
+          "contentDigest": "sha256:133452e2e3d639d26930125c30cbfe15eb23364cb6555c78b63c00842f69f750",
+          "authorizable": false
+        }
+      ],
+      "preconditions": [
+        {"kind": "absent", "path": ".sdd/work/example/work.yaml", "expectedRevision": 4}
+      ],
+      "digest": "sha256:58463e47efe0a8dcc69122060fa085f0924a66a4fc6d6bd9af78158eacf99a1d",
+      "authorizable": false
+    }
+  },
+  "diagnostics": [],
+  "nextActions": [],
+  "exitCode": 0
+}
