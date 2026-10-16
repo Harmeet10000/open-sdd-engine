@@ -37,11 +37,12 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-004 — Build deterministic dependency ports
 
-- [ ] FND-004 — Build deterministic dependency ports
+- [x] FND-004 — Build deterministic dependency ports
 - **Requirements:** REQ-003, REQ-015, REQ-016
 - **Depends on:** [FND-001]
 - Define narrow ports for immutable workspace observation, policy snapshot, filesystem fact reads, clock, and ID. Provide fixed-clock/fixed-ID and fault-injecting fakes. Signal entry points derive from caller context.
 - **Done when:** tests can control time/identity/cancellation without globals, intent-only IDs, or `context.Background()` replacement.
+- **Completed (2026-10-17):** `internal/engine/ports.go` defines the consumer-owned ports (`Clock`, `IDSource`, `Snapshotter`, `PolicySnapshotter`, `FileFacts`) with production adapters (`SystemClock`, `RandomIDSource`, `OSFileFacts`) and `ErrDependencyFault` for engine error mapping; `internal/testkit` provides `FixedClock`, `SequenceIDSource`, `MemFileFacts` (faults, blocking reads, `os.ErrNotExist` parity), `FixedPolicySnapshotter`, and `FixedSnapshotter`, all race-safe. Executable tests prove time/identity control, fault injection, cancellation propagation (blocked reads honor `ctx.Done`), defensive copies, and native round-trips; no port stores or replaces caller context.
 
 ### FND-005 — Implement snapshot decode/normalize and canonical layout discovery
 

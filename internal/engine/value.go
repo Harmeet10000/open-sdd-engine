@@ -150,7 +150,7 @@ func (s DiagnosticSource) Kind() string        { return s.kind }
 func (s DiagnosticSource) Path() string        { return s.path }
 func (s DiagnosticSource) Field() string       { return s.field }
 func (s DiagnosticSource) ArtifactID() string  { return s.artifactID }
-func (s DiagnosticSource) Range() *SourceRange { return clonePointer(s.rangeValue) }
+func (s DiagnosticSource) Range() *SourceRange { return cloneSourceRange(s.rangeValue) }
 
 func (s DiagnosticSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {

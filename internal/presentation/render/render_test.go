@@ -245,6 +245,55 @@ func TestHumanSummariesCoverEveryResultVariant(t *testing.T) {
 	}
 }
 
+func TestRedactionCoversJSONCredentialForms(t *testing.T) {
+	t.Parallel()
+
+	source, err := engine.NewDiagnosticSource(engine.DiagnosticSourceInput{Kind: "file"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostic, err := engine.NewDiagnostic(engine.DiagnosticInput{
+		Code:     "DIAG_USAGE_ERROR",
+		Severity: engine.SeverityError,
+		Message:  `auth failed for {"token":"abc123"} with password="not a real credential"`,
+		Source:   source,
+		Metadata: map[string]any{
+			"/repo/token=hunter2": "path-label",
+			"password":            "test-only-placeholder",
+			"nested":              map[string]any{"api_key": "qwerty"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcome := mustOutcome(t, engine.OutcomeInput{
+		Command:          engine.CommandUnknown,
+		RequestedCommand: "bad",
+		Diagnostics:      []engine.Diagnostic{diagnostic},
+		ExitCode:         engine.ExitUsage,
+	})
+	input := render.NewInput(outcome, render.NewRedactor())
+
+	var jsonOut bytes.Buffer
+	if err := render.WriteJSON(&jsonOut, input); err != nil {
+		t.Fatal(err)
+	}
+	rendered := jsonOut.String()
+	for _, leaked := range []string{"abc123", "not a real credential", "hunter2", "qwerty", "test-only-placeholder"} {
+		if strings.Contains(rendered, leaked) {
+			t.Fatalf("JSON credential form leaked %q: %s", leaked, rendered)
+		}
+	}
+	if !strings.Contains(rendered, "[REDACTED]") {
+		t.Fatalf("no redaction markers in %s", rendered)
+	}
+	// The authoritative outcome still carries exact metadata keys and values.
+	original := outcome.Diagnostics()[0].Metadata()
+	if _, ok := original["/repo/token=hunter2"]; !ok {
+		t.Fatalf("redaction mutated authoritative metadata keys: %v", original)
+	}
+}
+
 type errorWriter struct{ err error }
 
 func (w errorWriter) Write([]byte) (int, error) { return 0, w.err }
