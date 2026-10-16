@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "command": "status",
+  "ok": true,
+  "workspace": {"root": "/repo", "formatVersion": 1},
+  "work": null,
+  "result": {"kind": "status", "workItems": []},
+  "diagnostics": [],
+  "nextActions": [
+    {
+      "command": "sdd next --work work-1",
+      "reason": "Continue the work"
+    }
+  ],
+  "exitCode": 0
+}

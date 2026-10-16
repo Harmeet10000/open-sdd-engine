@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -133,7 +135,7 @@ func TestDiagnosticCatalogIsCompleteAndDeterministic(t *testing.T) {
 
 	validSeverity := map[string]bool{"info": true, "warning": true, "error": true, "critical": true}
 	validExit := map[int]bool{0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 130: true}
-	namespaces := map[string]struct{}{}
+	namespaces := map[string]map[string]struct{}{}
 	for _, namespace := range got.Namespaces {
 		if namespace.Prefix == "" || namespace.RegistryOwner != "sdd-engine-foundation" || len(namespace.Contributors) == 0 {
 			t.Errorf("invalid diagnostic namespace: %#v", namespace)
@@ -141,7 +143,11 @@ func TestDiagnosticCatalogIsCompleteAndDeterministic(t *testing.T) {
 		if _, exists := namespaces[namespace.Prefix]; exists {
 			t.Errorf("duplicate diagnostic namespace %q", namespace.Prefix)
 		}
-		namespaces[namespace.Prefix] = struct{}{}
+		contributors := make(map[string]struct{}, len(namespace.Contributors))
+		for _, contributor := range namespace.Contributors {
+			contributors[contributor] = struct{}{}
+		}
+		namespaces[namespace.Prefix] = contributors
 	}
 	for _, prefix := range []string{"DIAG_", "WORKFLOW_", "VALIDATION_", "COMPLETION_", "BUG_", "QUICK_SPEC_"} {
 		if _, exists := namespaces[prefix]; !exists {
@@ -151,8 +157,11 @@ func TestDiagnosticCatalogIsCompleteAndDeterministic(t *testing.T) {
 
 	seen := map[string]struct{}{}
 	for _, entry := range got.Codes {
-		if !strings.HasPrefix(entry.Code, "DIAG_") {
-			t.Errorf("code %q does not use the foundation namespace", entry.Code)
+		prefix, contributors, ok := diagnosticNamespace(entry.Code, namespaces)
+		if !ok {
+			t.Errorf("code %q does not use a registered namespace", entry.Code)
+		} else if _, allowed := contributors[entry.Owner]; !allowed {
+			t.Errorf("code %q owner %q cannot contribute to %q", entry.Code, entry.Owner, prefix)
 		}
 		if _, exists := seen[entry.Code]; exists {
 			t.Errorf("duplicate diagnostic code %q", entry.Code)
@@ -183,6 +192,44 @@ func TestDiagnosticCatalogIsCompleteAndDeterministic(t *testing.T) {
 	}
 }
 
+func TestDiagnosticCatalogCoversSpecificationReferences(t *testing.T) {
+	var got catalog
+	decodeStrict(t, "diagnostics.catalog.json", &got)
+
+	registered := make(map[string]struct{}, len(got.Codes))
+	for _, entry := range got.Codes {
+		registered[entry.Code] = struct{}{}
+	}
+
+	codePattern := regexp.MustCompile(`\b(?:DIAG|WORKFLOW|VALIDATION|COMPLETION|BUG|QUICK_SPEC)_[A-Z0-9_]+\b`)
+	referenced := map[string][]string{}
+	err := filepath.WalkDir("../.kiro/specs", func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".md" {
+			return nil
+		}
+		contents, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		for _, match := range codePattern.FindAllString(string(contents), -1) {
+			referenced[match] = append(referenced[match], path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for code, paths := range referenced {
+		if _, exists := registered[code]; !exists {
+			t.Errorf("referenced diagnostic %q is not registered (for example in %s)", code, paths[0])
+		}
+	}
+}
+
 func TestVersionFileTracksPublishedContract(t *testing.T) {
 	b, err := os.ReadFile("VERSION")
 	if err != nil {
@@ -207,4 +254,13 @@ func decodeStrict(t *testing.T, path string, target any) {
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		t.Fatalf("decode %s: expected one JSON document, got %v", path, err)
 	}
+}
+
+func diagnosticNamespace(code string, namespaces map[string]map[string]struct{}) (string, map[string]struct{}, bool) {
+	for prefix, contributors := range namespaces {
+		if strings.HasPrefix(code, prefix) {
+			return prefix, contributors, true
+		}
+	}
+	return "", nil, false
 }

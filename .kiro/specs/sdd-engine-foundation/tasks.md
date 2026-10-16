@@ -10,20 +10,21 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-001 — Freeze protocol vocabulary and schema inventory
 
-- [ ] FND-001 — Freeze protocol vocabulary and schema inventory
+- [x] FND-001 — Freeze protocol vocabulary and schema inventory
 - **Requirements:** REQ-002, REQ-003, REQ-008, REQ-009, REQ-010
 - **Depends on:** []
 - Record the product-plan envelope (`schemaVersion`, `command`, `ok`, `workspace`, `work`, `result`, `diagnostics`, `nextActions`), discriminated command/result kinds, nullability, severity, source object, structured next actions, and exit taxonomy.
 - **Done when:** a checked-in schema inventory and catalog map has no competing `protocolVersion` envelope and every referenced code has severity/exit/remediation metadata.
-- **Implementation progress (2026-10-15):** `protocol/extension-inventory.json` now centrally preserves published `1.0`, allocates-but-does-not-publish `1.1`, assigns one owner to every prerequisite/guided extension family, and forbids a competing `protocolVersion` envelope. `protocol/diagnostics.catalog.json` registers the shared namespaces and supplies complete core/workspace entries. Executable registry tests pass. This task remains unchecked until every referenced workflow, validation, completion, Bug Fix, and Quick Spec code has a complete catalog entry.
+- **Completed (2026-10-16):** `protocol/extension-inventory.json` centrally preserves published `1.0`, allocates-but-does-not-publish `1.1`, assigns one owner to every prerequisite/guided extension family, and forbids a competing `protocolVersion` envelope. `protocol/diagnostics.catalog.json` now supplies complete metadata for every diagnostic referenced by the prerequisite and guided specifications. Executable tests validate namespaces, contributors, ownership, exit metadata, and scan `.kiro/specs/**/*.md` so a newly referenced code cannot bypass registration.
 
 ### FND-002 — Add offline schema resolver and negative fixtures
 
-- [ ] FND-002 — Add offline schema resolver and negative fixtures
+- [x] FND-002 — Add offline schema resolver and negative fixtures
 - **Requirements:** REQ-002
 - **Depends on:** [FND-001]
 - Add normative schemas with corrected draft-07 dialect URI, stable `$id`, resolved local `$ref`s, closed discriminators, and valid JSON examples. Use a full draft-07 validator, including conditional keywords; do not use jq as schema validation. Convert symbolic documentation examples into complete, digest-correct runtime fixtures.
 - **Done when:** valid examples parse as JSON and malformed refs, null arrays, wrong result kinds, missing severity, string sources, and shell-only next actions fail validation.
+- **Completed (2026-10-16):** `protocol/schema/foundation-1.0.json` materializes the normative bundle with the exact Draft-07 URI, stable ID, closed command/result variants, local references, conditional operation rules, and canonical SHA-256 wire syntax. An embedded, network-denying resolver compiles the contract and command fragment in tests. Executable positive fixtures cover status, version, unknown command, and start dry-run; negative fixtures cover unregistered refs and every required malformed shape. The dry-run content digest is recomputed from exact proposed bytes. Semantic plan-digest recomputation remains correctly owned by FND-006/FND-011.
 
 ### FND-003 — Define immutable protocol types and outcome renderer seam
 

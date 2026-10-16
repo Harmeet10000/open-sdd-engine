@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0",
+  "command": "version",
+  "ok": true,
+  "workspace": null,
+  "work": null,
+  "result": {
+    "kind": "version",
+    "version": "0.1.0-dev",
+    "commit": "unknown",
+    "buildTime": "unknown",
+    "goVersion": "go1.24.0",
+    "buildInputs": {"sourceDateEpoch": "0"},
+    "protocolSchemaVersion": "1.0"
+  },
+  "diagnostics": [],
+  "nextActions": [],
+  "exitCode": 0
+}

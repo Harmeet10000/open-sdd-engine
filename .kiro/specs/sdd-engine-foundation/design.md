@@ -54,6 +54,10 @@ The following is valid draft-07 JSON. Its `definitions.Command`, `definitions.Ou
   "$id": "https://sdd.dev/schema/foundation-1.0.json",
   "$ref": "#/definitions/Outcome",
   "definitions": {
+    "Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "WorkspaceRef": {
       "type": "object",
       "additionalProperties": false,
@@ -190,8 +194,8 @@ The following is valid draft-07 JSON. Its `definitions.Command`, `definitions.Ou
         "kind": {"enum": ["create-file", "update-file", "delete-file"]},
         "path": {"type": "string", "minLength": 1},
         "content": {"type": "string"},
-        "contentDigest": {"type": "string", "minLength": 1},
-        "expectedDigest": {"type": "string", "minLength": 1},
+        "contentDigest": {"$ref": "#/definitions/Digest"},
+        "expectedDigest": {"$ref": "#/definitions/Digest"},
         "expectedRevision": {"type": "integer", "minimum": 0},
         "authorizable": {"type": "boolean"}
       },
@@ -208,7 +212,7 @@ The following is valid draft-07 JSON. Its `definitions.Command`, `definitions.Ou
         "kind": {"enum": ["revision", "digest", "absent"]},
         "path": {"type": "string", "minLength": 1},
         "expectedRevision": {"type": "integer", "minimum": 0},
-        "expectedDigest": {"type": "string"}
+        "expectedDigest": {"$ref": "#/definitions/Digest"}
       },
       "allOf": [
         {"if": {"properties": {"kind": {"const": "digest"}}}, "then": {"required": ["expectedDigest"]}}
@@ -224,13 +228,13 @@ The following is valid draft-07 JSON. Its `definitions.Command`, `definitions.Ou
         "workId": {"type": "string", "minLength": 1},
         "revisionScope": {"enum": ["workspace", "work"]},
         "expectedRevision": {"type": "integer", "minimum": 0},
-        "inputDigest": {"type": "string", "minLength": 1},
-        "policyDigest": {"type": "string", "minLength": 1},
-        "workflowDefinitionDigest": {"type": "string", "minLength": 1},
-        "validatorDefinitionDigest": {"type": "string", "minLength": 1},
+        "inputDigest": {"$ref": "#/definitions/Digest"},
+        "policyDigest": {"$ref": "#/definitions/Digest"},
+        "workflowDefinitionDigest": {"$ref": "#/definitions/Digest"},
+        "validatorDefinitionDigest": {"$ref": "#/definitions/Digest"},
         "operations": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/PlanOperation"}},
         "preconditions": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/PlanPrecondition"}},
-        "digest": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/definitions/Digest"},
         "idempotencyKey": {"type": "string"},
         "authorizable": {"type": "boolean"}
       }
@@ -313,14 +317,14 @@ A dry-run result uses the public `start` command with `dryRun: true` at input an
   "ok": true,
   "workspace": {"root": "/repo", "formatVersion": 1},
   "work": null,
-  "result": {"kind": "start-dry-run", "plan": {"planId": "plan-1", "workspaceId": "ws-1", "workId": "work-1", "revisionScope": "workspace", "expectedRevision": 4, "inputDigest": "sha256:input", "policyDigest": "sha256:policy", "workflowDefinitionDigest": "sha256:workflow", "validatorDefinitionDigest": "sha256:validators", "operations": [{"kind": "create-file", "path": ".sdd/work/new/work.yaml", "expectedRevision": 4, "content": "workId: work-1\n", "contentDigest": "sha256:content", "authorizable": false}], "preconditions": [{"kind": "absent", "path": ".sdd/work/new/work.yaml", "expectedRevision": 4}], "digest": "sha256:plan", "authorizable": false}},
+  "result": {"kind": "start-dry-run", "plan": {"planId": "plan-1", "workspaceId": "ws-1", "workId": "work-1", "revisionScope": "workspace", "expectedRevision": 4, "inputDigest": "sha256:b727d8da7e2cbd385d9e474234dda18a9677913b37f40a8074b410d2efbce58c", "policyDigest": "sha256:6d96b4f675f734210734c22f9d1f78eb21ee03316fe04068cf64f1ebdf97f3a6", "workflowDefinitionDigest": "sha256:44e103af0242e49bc680a1ee30f96c847814cdf79401b1f6f10b1b7275bc623d", "validatorDefinitionDigest": "sha256:e25d7eb5474afb9a12bf09813d869079e847bf64c9d79c12b68939870af944a6", "operations": [{"kind": "create-file", "path": ".sdd/work/new/work.yaml", "expectedRevision": 4, "content": "workId: work-1\n", "contentDigest": "sha256:133452e2e3d639d26930125c30cbfe15eb23364cb6555c78b63c00842f69f750", "authorizable": false}], "preconditions": [{"kind": "absent", "path": ".sdd/work/new/work.yaml", "expectedRevision": 4}], "digest": "sha256:58463e47efe0a8dcc69122060fa085f0924a66a4fc6d6bd9af78158eacf99a1d", "authorizable": false}},
   "diagnostics": [{"code": "DIAG_PLAN_NOT_AUTHORIZABLE", "severity": "warning", "message": "Preview only; durable application is not implemented in foundation", "source": {"kind": "plan"}, "retryable": false}],
   "nextActions": [],
   "exitCode": 0
 }
 ```
 
-The no-workspace status outcome uses `ok: false`, `workspace: null`, `result: null`, and `DIAG_WORKSPACE_NOT_FOUND` with exit code `3`; a missing workspace cannot appear as a successful status. The dry-run example illustrates wire shape with symbolic digest values and abbreviated work content; it is not an executable fixture. Runtime conformance fixtures must contain complete records and recomputed SHA-256 digests. Foundation plans are always preview-only (`authorizable: false`); a successful preview does not claim application is available.
+The no-workspace status outcome uses `ok: false`, `workspace: null`, `result: null`, and `DIAG_WORKSPACE_NOT_FOUND` with exit code `3`; a missing workspace cannot appear as a successful status. The dry-run example is mirrored by the executable schema fixture under `protocol/testdata/outcome/valid/`; its digest fields use the canonical lower-case SHA-256 wire form. FND-006 and FND-011 own semantic digest preimage and stable-plan recomputation tests. Foundation plans are always preview-only (`authorizable: false`); a successful preview does not claim application is available.
 
 ### Core values
 

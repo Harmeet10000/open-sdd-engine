@@ -108,10 +108,10 @@
     {
       "code": "DIAG_PLAN_NOT_AUTHORIZABLE",
       "owner": "sdd-engine-foundation",
-      "severity": "error",
-      "exitCode": 6,
+      "severity": "warning",
+      "exitCode": 0,
       "sourceKinds": ["plan", "policy"],
-      "remediation": "Resolve unsupported effects or policy blockers before requesting authorization.",
+      "remediation": "Treat the result as a preview; resolve unsupported effects or policy blockers before requesting authorization.",
       "retryable": false
     },
     {
@@ -256,6 +256,456 @@
       "exitCode": 3,
       "sourceKinds": ["workspace", "path", "field"],
       "remediation": "Narrow the requested scope or use an approved larger bounded limit.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_DEFINITION_INVALID",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "schema"],
+      "remediation": "Correct the pinned workflow definition and compile it again.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_REFERENCE_MISSING",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "field"],
+      "remediation": "Provide the referenced node, predicate, profile, or definition at its pinned identity.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_TYPE_MISMATCH",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "field"],
+      "remediation": "Make the producer and consumer fact types agree in the workflow definition.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_DEPENDENCY_CYCLE",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "graph"],
+      "remediation": "Break the reported dependency cycle without weakening a required gate.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_READINESS_CYCLE",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "graph"],
+      "remediation": "Break the reported readiness cycle and recompile the pinned definition.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_ROUTE_IMPOSSIBLE",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "graph"],
+      "remediation": "Add a satisfiable route or remove the unreachable workflow state.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_GATE_UNREACHABLE",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "gate"],
+      "remediation": "Correct the graph so the required gate can be reached under an allowed fact assignment.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_COMPILE_LIMIT",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "graph"],
+      "remediation": "Reduce the workflow definition within the versioned compilation limits.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_COMPILE_ANALYSIS_LIMIT",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "graph"],
+      "remediation": "Simplify the bounded predicate region so static analysis can prove it within policy limits.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_FACT_UNKNOWN",
+      "owner": "sdd-workflow-graph",
+      "severity": "warning",
+      "exitCode": 0,
+      "sourceKinds": ["workflow", "fact"],
+      "remediation": "Produce or obtain the named typed fact before attempting the blocked transition.",
+      "retryable": true
+    },
+    {
+      "code": "WORKFLOW_GATE_BLOCKED",
+      "owner": "sdd-workflow-graph",
+      "severity": "warning",
+      "exitCode": 0,
+      "sourceKinds": ["workflow", "gate"],
+      "remediation": "Satisfy the reported gate using accepted evidence before advancing.",
+      "retryable": true
+    },
+    {
+      "code": "WORKFLOW_POLICY_UNAVAILABLE",
+      "owner": "sdd-workflow-graph",
+      "severity": "critical",
+      "exitCode": 6,
+      "sourceKinds": ["workflow", "policy"],
+      "remediation": "Restore a current trusted policy snapshot; do not substitute local defaults.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_POLICY_FLOOR",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 6,
+      "sourceKinds": ["workflow", "policy"],
+      "remediation": "Select a composition that meets or exceeds the trusted policy floor.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_DEFINITION_MISSING",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["workflow", "schema"],
+      "remediation": "Restore the exact pinned definition; never replace it with the newest same-name definition.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_UPDATE_AVAILABLE",
+      "owner": "sdd-workflow-graph",
+      "severity": "warning",
+      "exitCode": 4,
+      "sourceKinds": ["workflow", "definition"],
+      "remediation": "Review and explicitly migrate to the new definition while preserving work identity and evidence.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_ACTION_STALE",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["workflow", "action"],
+      "remediation": "Request a fresh action proposal for the current work revision.",
+      "retryable": true
+    },
+    {
+      "code": "WORKFLOW_SUBMISSION_CONFLICT",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["workflow", "submission"],
+      "remediation": "Refresh the work snapshot and resubmit against the current action and work revisions.",
+      "retryable": true
+    },
+    {
+      "code": "WORKFLOW_VALIDATION_FAILED",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "validation"],
+      "remediation": "Resolve the trusted validator findings and produce a new candidate revision.",
+      "retryable": true
+    },
+    {
+      "code": "WORKFLOW_EXECUTION_UNAVAILABLE",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 5,
+      "sourceKinds": ["workflow", "provider"],
+      "remediation": "Configure an authorized execution provider with the required capability.",
+      "retryable": true
+    },
+    {
+      "code": "WORKFLOW_ATTEMPT_EXHAUSTED",
+      "owner": "sdd-workflow-graph",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "action"],
+      "remediation": "Inspect the attempt evidence and request an authorized intervention or revised plan.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_RECOVERY_REQUIRED",
+      "owner": "sdd-workflow-graph",
+      "severity": "critical",
+      "exitCode": 4,
+      "sourceKinds": ["workflow", "transaction", "provider"],
+      "remediation": "Resolve the durable workspace or provider recovery state before advancing the graph.",
+      "retryable": false
+    },
+    {
+      "code": "WORKFLOW_CACHE_REBUILD_REQUIRED",
+      "owner": "sdd-workflow-graph",
+      "severity": "warning",
+      "exitCode": 0,
+      "sourceKinds": ["workflow", "projection"],
+      "remediation": "Rebuild the disposable workflow projection from authoritative definitions and events.",
+      "retryable": true
+    },
+    {
+      "code": "WORKFLOW_ESCALATION_REQUIRED",
+      "owner": "sdd-workflow-graph",
+      "severity": "warning",
+      "exitCode": 0,
+      "sourceKinds": ["workflow", "policy", "risk"],
+      "remediation": "Apply the policy-selected higher-rigor composition while preserving work identity and accepted evidence.",
+      "retryable": false
+    },
+    {
+      "code": "VALIDATION_YAML_DUPLICATE_KEY",
+      "owner": "sdd-artifact-validation",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["artifact", "path", "field"],
+      "remediation": "Remove the duplicate YAML key and submit a new artifact candidate.",
+      "retryable": false
+    },
+    {
+      "code": "VALIDATION_YAML_LIMIT",
+      "owner": "sdd-artifact-validation",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["artifact", "path"],
+      "remediation": "Reduce YAML depth, aliases, expansion, or size below the versioned hard limit.",
+      "retryable": false
+    },
+    {
+      "code": "VALIDATION_YAML_ALIAS_CYCLE",
+      "owner": "sdd-artifact-validation",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["artifact", "path"],
+      "remediation": "Break the YAML anchor and alias cycle before parsing the artifact again.",
+      "retryable": false
+    },
+    {
+      "code": "VALIDATION_ID_COLLISION",
+      "owner": "sdd-artifact-validation",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["artifact", "identity"],
+      "remediation": "Allocate a unique stable identity in the declared workspace and work namespace.",
+      "retryable": false
+    },
+    {
+      "code": "VALIDATION_TRACEABILITY_INVALID",
+      "owner": "sdd-artifact-validation",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["artifact", "traceability"],
+      "remediation": "Repair the typed traceability edge using an unambiguous live target identity.",
+      "retryable": false
+    },
+    {
+      "code": "VALIDATION_GRAPH_CYCLIC",
+      "owner": "sdd-artifact-validation",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["artifact", "graph"],
+      "remediation": "Break the derivation or traceability cycle before computing dependent meaning.",
+      "retryable": false
+    },
+    {
+      "code": "VALIDATION_VALIDATOR_UNKNOWN",
+      "owner": "sdd-artifact-validation",
+      "severity": "error",
+      "exitCode": 3,
+      "sourceKinds": ["validation", "provider", "policy"],
+      "remediation": "Select a validator descriptor from trusted versioned configuration.",
+      "retryable": false
+    },
+    {
+      "code": "COMPLETION_GATE_BLOCKED",
+      "owner": "sdd-completion-lifecycle",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["completion", "gate"],
+      "remediation": "Satisfy every applicable completion gate against the same candidate before retrying.",
+      "retryable": true
+    },
+    {
+      "code": "COMPLETION_CANDIDATE_STALE",
+      "owner": "sdd-completion-lifecycle",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["completion", "candidate"],
+      "remediation": "Capture the changed candidate and repeat verification and approval for its new digest.",
+      "retryable": true
+    },
+    {
+      "code": "COMPLETION_EVIDENCE_UNAVAILABLE",
+      "owner": "sdd-completion-lifecycle",
+      "severity": "error",
+      "exitCode": 5,
+      "sourceKinds": ["completion", "evidence", "provider"],
+      "remediation": "Restore the mandatory evidence or authorized provider; never substitute an untrusted claim.",
+      "retryable": true
+    },
+    {
+      "code": "COMPLETION_APPROVAL_EXPIRED",
+      "owner": "sdd-completion-lifecycle",
+      "severity": "error",
+      "exitCode": 6,
+      "sourceKinds": ["completion", "approval", "policy"],
+      "remediation": "Obtain a current approval bound to the exact candidate, policy, and issuer state.",
+      "retryable": false
+    },
+    {
+      "code": "COMPLETION_PROMOTION_CONFLICT",
+      "owner": "sdd-completion-lifecycle",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["completion", "candidate", "transaction"],
+      "remediation": "Review the three-way conflict facts and create a new completion proposal.",
+      "retryable": true
+    },
+    {
+      "code": "COMPLETION_RECOVERY_REQUIRED",
+      "owner": "sdd-completion-lifecycle",
+      "severity": "critical",
+      "exitCode": 4,
+      "sourceKinds": ["completion", "transaction"],
+      "remediation": "Resolve the prepared or quarantined workspace transaction before promoting completion.",
+      "retryable": false
+    },
+    {
+      "code": "COMPLETION_SCOPE_DEFERRED",
+      "owner": "sdd-completion-lifecycle",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["completion", "scope"],
+      "remediation": "Record an authorized follow-up or supersession for every required deferred scope item.",
+      "retryable": true
+    },
+    {
+      "code": "BUG_REPRODUCTION_REQUIRED",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "artifact", "bug"],
+      "remediation": "Provide a bounded reproduction or an explicit accepted non-reproduction observation before diagnosis.",
+      "retryable": true
+    },
+    {
+      "code": "BUG_REPRODUCTION_UNASSESSED",
+      "owner": "sdd-guided-workflows",
+      "severity": "warning",
+      "exitCode": 0,
+      "sourceKinds": ["workflow", "artifact", "bug"],
+      "remediation": "Assess the reproduction evidence and record supported, unsupported, or unavailable state explicitly.",
+      "retryable": true
+    },
+    {
+      "code": "BUG_DIAGNOSIS_UNSUPPORTED",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "artifact", "bug"],
+      "remediation": "Gather evidence for the claimed cause or classify the change as a mitigation with required follow-up.",
+      "retryable": true
+    },
+    {
+      "code": "BUG_REGRESSION_REQUIRED",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "artifact", "bug"],
+      "remediation": "Define the regression contract before implementation and bind later verification to the final candidate.",
+      "retryable": true
+    },
+    {
+      "code": "BUG_VERIFICATION_REQUIRED",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "validation", "bug"],
+      "remediation": "Run the trusted verification required by policy against the unchanged final candidate.",
+      "retryable": true
+    },
+    {
+      "code": "BUG_SPEC_CONFLICT_UNRESOLVED",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "artifact", "bug"],
+      "remediation": "Resolve whether the implementation or accepted specification is defective before finishing.",
+      "retryable": true
+    },
+    {
+      "code": "BUG_TEMPORARY_PROBE_UNRESOLVED",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "artifact", "bug"],
+      "remediation": "Remove, retain under explicit policy, or otherwise account for every temporary diagnostic probe.",
+      "retryable": true
+    },
+    {
+      "code": "QUICK_SPEC_CLARIFICATION_REQUIRED",
+      "owner": "sdd-guided-workflows",
+      "severity": "warning",
+      "exitCode": 0,
+      "sourceKinds": ["workflow", "artifact", "clarification"],
+      "remediation": "Answer the material clarification from trusted evidence before generating the spec bundle.",
+      "retryable": true
+    },
+    {
+      "code": "QUICK_SPEC_BUNDLE_INCOMPLETE",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "artifact", "bundle"],
+      "remediation": "Submit requirements, design, and tasks together with their required identities and digests.",
+      "retryable": true
+    },
+    {
+      "code": "QUICK_SPEC_BUNDLE_REJECTED",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "validation", "bundle"],
+      "remediation": "Resolve the structured review findings and submit a new bundle candidate revision.",
+      "retryable": true
+    },
+    {
+      "code": "QUICK_SPEC_TRACEABILITY_INVALID",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 1,
+      "sourceKinds": ["workflow", "artifact", "traceability"],
+      "remediation": "Repair requirements-to-design-to-task edges using stable IDs and current derivation digests.",
+      "retryable": true
+    },
+    {
+      "code": "QUICK_SPEC_BUNDLE_STALE",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 4,
+      "sourceKinds": ["workflow", "artifact", "bundle"],
+      "remediation": "Regenerate or rebase the bundle against the current work and definition revisions.",
+      "retryable": true
+    },
+    {
+      "code": "QUICK_SPEC_APPROVAL_REQUIRED",
+      "owner": "sdd-guided-workflows",
+      "severity": "error",
+      "exitCode": 6,
+      "sourceKinds": ["workflow", "approval", "bundle"],
+      "remediation": "Obtain an authorized approval bound to the exact bundle, policy, and work revision.",
       "retryable": false
     }
   ]

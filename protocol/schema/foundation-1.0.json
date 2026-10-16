@@ -1,0 +1,333 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sdd.dev/schema/foundation-1.0.json",
+  "$ref": "#/definitions/Outcome",
+  "definitions": {
+    "Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "WorkspaceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "formatVersion"],
+      "properties": {
+        "root": {"type": "string", "minLength": 1},
+        "formatVersion": {"type": "integer", "minimum": 1}
+      }
+    },
+    "WorkRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "slug", "revision"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "slug": {"type": "string", "minLength": 1},
+        "workflow": {"type": "string", "minLength": 1},
+        "revision": {"type": "integer", "minimum": 0}
+      }
+    },
+    "SourceRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "start"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "start": {"$ref": "#/definitions/Position"},
+        "end": {"$ref": "#/definitions/Position"}
+      }
+    },
+    "Position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["line", "column", "unit"],
+      "properties": {
+        "line": {"type": "integer", "minimum": 1},
+        "column": {"type": "integer", "minimum": 1},
+        "unit": {"enum": ["utf8-byte", "unicode-scalar"]}
+      }
+    },
+    "DiagnosticSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "path": {"type": "string"},
+        "field": {"type": "string"},
+        "artifactId": {"type": "string"},
+        "range": {"$ref": "#/definitions/SourceRange"}
+      }
+    },
+    "Diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message", "source", "retryable"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+        "severity": {"enum": ["info", "warning", "error", "critical"]},
+        "message": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/definitions/DiagnosticSource"},
+        "remediation": {"type": "string"},
+        "metadata": {"type": "object", "additionalProperties": true},
+        "retryable": {"type": "boolean"}
+      }
+    },
+    "NextAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "args", "flags", "reason"],
+      "properties": {
+        "command": {"type": "string", "minLength": 1},
+        "args": {"type": "array", "items": {"type": "string"}},
+        "flags": {
+          "type": "object",
+          "additionalProperties": {"type": ["string", "boolean", "integer", "number"]}
+        },
+        "reason": {"type": "string", "minLength": 1},
+        "expectedRevision": {"type": "integer", "minimum": 0}
+      }
+    },
+    "StatusCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {"const": "status"},
+        "workId": {"type": "string"},
+        "root": {"type": "string"}
+      }
+    },
+    "VersionCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {"type": {"const": "version"}}
+    },
+    "DoctorCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {"const": "doctor"},
+        "root": {"type": "string"}
+      }
+    },
+    "StartCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "dryRun", "intent"],
+      "properties": {
+        "type": {"const": "start"},
+        "dryRun": {"const": true},
+        "intent": {"type": "string", "minLength": 1},
+        "workflow": {"type": "string"},
+        "root": {"type": "string"}
+      }
+    },
+    "Command": {
+      "oneOf": [
+        {"$ref": "#/definitions/StatusCommand"},
+        {"$ref": "#/definitions/VersionCommand"},
+        {"$ref": "#/definitions/DoctorCommand"},
+        {"$ref": "#/definitions/StartCommand"}
+      ]
+    },
+    "StatusResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "workItems"],
+      "properties": {
+        "kind": {"const": "status"},
+        "workItems": {"type": "array", "items": {"$ref": "#/definitions/WorkRef"}}
+      }
+    },
+    "VersionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "version", "commit", "buildTime", "goVersion", "buildInputs", "protocolSchemaVersion"],
+      "properties": {
+        "kind": {"const": "version"},
+        "version": {"type": "string"},
+        "commit": {"type": "string"},
+        "buildTime": {"type": "string"},
+        "goVersion": {"type": "string"},
+        "buildInputs": {"type": "object", "additionalProperties": {"type": "string"}},
+        "protocolSchemaVersion": {"const": "1.0"}
+      }
+    },
+    "DoctorResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "checks"],
+      "properties": {
+        "kind": {"const": "doctor"},
+        "checks": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+      }
+    },
+    "PlanOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "expectedRevision", "authorizable"],
+      "properties": {
+        "kind": {"enum": ["create-file", "update-file", "delete-file"]},
+        "path": {"type": "string", "minLength": 1},
+        "content": {"type": "string"},
+        "contentDigest": {"$ref": "#/definitions/Digest"},
+        "expectedDigest": {"$ref": "#/definitions/Digest"},
+        "expectedRevision": {"type": "integer", "minimum": 0},
+        "authorizable": {"type": "boolean"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"enum": ["create-file", "update-file"]}}},
+          "then": {"required": ["content", "contentDigest"]}
+        },
+        {
+          "if": {"properties": {"kind": {"enum": ["update-file", "delete-file"]}}},
+          "then": {"required": ["expectedDigest"]}
+        }
+      ]
+    },
+    "PlanPrecondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "expectedRevision"],
+      "properties": {
+        "kind": {"enum": ["revision", "digest", "absent"]},
+        "path": {"type": "string", "minLength": 1},
+        "expectedRevision": {"type": "integer", "minimum": 0},
+        "expectedDigest": {"$ref": "#/definitions/Digest"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "digest"}}},
+          "then": {"required": ["expectedDigest"]}
+        }
+      ]
+    },
+    "MutationPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planId",
+        "workspaceId",
+        "workId",
+        "revisionScope",
+        "expectedRevision",
+        "inputDigest",
+        "policyDigest",
+        "workflowDefinitionDigest",
+        "validatorDefinitionDigest",
+        "operations",
+        "preconditions",
+        "digest",
+        "authorizable"
+      ],
+      "properties": {
+        "planId": {"type": "string", "minLength": 1},
+        "workspaceId": {"type": "string", "minLength": 1},
+        "workId": {"type": "string", "minLength": 1},
+        "revisionScope": {"enum": ["workspace", "work"]},
+        "expectedRevision": {"type": "integer", "minimum": 0},
+        "inputDigest": {"$ref": "#/definitions/Digest"},
+        "policyDigest": {"$ref": "#/definitions/Digest"},
+        "workflowDefinitionDigest": {"$ref": "#/definitions/Digest"},
+        "validatorDefinitionDigest": {"$ref": "#/definitions/Digest"},
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/definitions/PlanOperation"}
+        },
+        "preconditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/definitions/PlanPrecondition"}
+        },
+        "digest": {"$ref": "#/definitions/Digest"},
+        "idempotencyKey": {"type": "string"},
+        "authorizable": {"type": "boolean"}
+      }
+    },
+    "StartDryRunResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "plan"],
+      "properties": {
+        "kind": {"const": "start-dry-run"},
+        "plan": {"$ref": "#/definitions/MutationPlan"}
+      }
+    },
+    "Outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "command", "ok", "workspace", "work", "result", "diagnostics", "nextActions", "exitCode"],
+      "properties": {
+        "schemaVersion": {"const": "1.0"},
+        "command": {"enum": ["status", "version", "doctor", "start", "unknown"]},
+        "requestedCommand": {"type": "string"},
+        "ok": {"type": "boolean"},
+        "exitCode": {"enum": [0, 1, 2, 3, 4, 5, 6, 130]},
+        "workspace": {"anyOf": [{"$ref": "#/definitions/WorkspaceRef"}, {"type": "null"}]},
+        "work": {"anyOf": [{"$ref": "#/definitions/WorkRef"}, {"type": "null"}]},
+        "result": {
+          "anyOf": [
+            {"$ref": "#/definitions/StatusResult"},
+            {"$ref": "#/definitions/VersionResult"},
+            {"$ref": "#/definitions/DoctorResult"},
+            {"$ref": "#/definitions/StartDryRunResult"},
+            {"type": "null"}
+          ]
+        },
+        "diagnostics": {"type": "array", "items": {"$ref": "#/definitions/Diagnostic"}},
+        "nextActions": {"type": "array", "items": {"$ref": "#/definitions/NextAction"}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"ok": {"const": true}}},
+          "then": {
+            "properties": {"exitCode": {"const": 0}},
+            "not": {"properties": {"result": {"type": "null"}}}
+          },
+          "else": {
+            "properties": {
+              "exitCode": {"enum": [1, 2, 3, 4, 5, 6, 130]},
+              "diagnostics": {"minItems": 1}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"command": {"const": "unknown"}}},
+          "then": {
+            "required": ["requestedCommand"],
+            "properties": {
+              "ok": {"const": false},
+              "exitCode": {"const": 2},
+              "result": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"ok": {"const": true}, "command": {"enum": ["status", "doctor", "start"]}}},
+          "then": {"properties": {"workspace": {"$ref": "#/definitions/WorkspaceRef"}}}
+        },
+        {
+          "if": {"properties": {"command": {"const": "status"}}},
+          "then": {"properties": {"result": {"anyOf": [{"$ref": "#/definitions/StatusResult"}, {"type": "null"}]}}}
+        },
+        {
+          "if": {"properties": {"command": {"const": "version"}}},
+          "then": {"properties": {"result": {"anyOf": [{"$ref": "#/definitions/VersionResult"}, {"type": "null"}]}}}
+        },
+        {
+          "if": {"properties": {"command": {"const": "doctor"}}},
+          "then": {"properties": {"result": {"anyOf": [{"$ref": "#/definitions/DoctorResult"}, {"type": "null"}]}}}
+        },
+        {
+          "if": {"properties": {"command": {"const": "start"}}},
+          "then": {"properties": {"result": {"anyOf": [{"$ref": "#/definitions/StartDryRunResult"}, {"type": "null"}]}}}
+        }
+      ]
+    }
+  }
+}
