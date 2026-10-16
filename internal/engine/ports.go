@@ -27,7 +27,8 @@ import (
 
 // ErrDependencyFault marks a non-context failure inside a dependency port.
 // Engine error mapping matches it to decide between caller-correctable and
-// operational outcomes. Context cancellation and deadline errors propagate
+// operational outcomes. Absence is wrapped too, so match os.ErrNotExist
+// before this sentinel. Context cancellation and deadline errors propagate
 // unwrapped so errors.Is(err, context.Canceled) keeps working.
 var ErrDependencyFault = errors.New("dependency port fault")
 
