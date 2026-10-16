@@ -242,9 +242,12 @@ jobs:
       - name: Build twice with fixed inputs and compare
         run: |
           set -euo pipefail
-          FLAGS='-mod=readonly -trimpath -ldflags "-X main.version=0.1.0-test -X main.commit=test -X main.buildTime=1970-01-01T00:00:00Z"'
-          go build $FLAGS -o "${{ runner.temp }}/sdd-a" ./cmd/sdd
-          go build $FLAGS -o "${{ runner.temp }}/sdd-b" ./cmd/sdd
+          build_flags=(
+            -mod=readonly -trimpath
+            -ldflags "-X main.version=0.1.0-test -X main.commit=test -X main.buildTime=1970-01-01T00:00:00Z"
+          )
+          go build "${build_flags[@]}" -o "${{ runner.temp }}/sdd-a" ./cmd/sdd
+          go build "${build_flags[@]}" -o "${{ runner.temp }}/sdd-b" ./cmd/sdd
           cmp "${{ runner.temp }}/sdd-a" "${{ runner.temp }}/sdd-b"
 
   lint:

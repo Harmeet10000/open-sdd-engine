@@ -23,9 +23,22 @@ func TestTransactionSeamContractIsVersionedInput(t *testing.T) {
 		ContractVersion string `json:"contractVersion"`
 		Owner           string `json:"owner"`
 		PlanBinding     struct {
+			Fields            []string `json:"fields"`
+			ConditionalFields []string `json:"conditionalFields"`
+			Rules             []string `json:"rules"`
+		} `json:"planBinding"`
+		PolicyPrecedence struct {
+			Order      []string `json:"order"`
+			FailClosed []string `json:"failClosed"`
+		} `json:"policyPrecedence"`
+		ExceptionScope struct {
 			Fields []string `json:"fields"`
 			Rules  []string `json:"rules"`
-		} `json:"planBinding"`
+		} `json:"exceptionScope"`
+		GitProvenance struct {
+			Optional bool   `json:"optional"`
+			Note     string `json:"note"`
+		} `json:"gitProvenance"`
 		ScenarioInventory []struct {
 			ID       string         `json:"id"`
 			Name     string         `json:"name"`
@@ -44,6 +57,30 @@ func TestTransactionSeamContractIsVersionedInput(t *testing.T) {
 	}
 	if len(contract.PlanBinding.Rules) == 0 {
 		t.Fatal("contract records no binding rules")
+	}
+	if len(contract.PlanBinding.ConditionalFields) == 0 {
+		t.Fatal("contract records no conditional binding fields")
+	}
+	if len(contract.PolicyPrecedence.Order) != 3 || len(contract.PolicyPrecedence.FailClosed) == 0 {
+		t.Fatalf("contract policy precedence is incomplete: %#v", contract.PolicyPrecedence)
+	}
+	for _, field := range []string{"actor", "grantScope", "authorizationEvidence", "policySnapshotDigest", "issuedAt", "expiresAt", "revocationState"} {
+		found := false
+		for _, recorded := range contract.ExceptionScope.Fields {
+			if recorded == field {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("contract exception scope lacks %q", field)
+		}
+	}
+	if len(contract.ExceptionScope.Rules) == 0 {
+		t.Fatal("contract records no exception rules")
+	}
+	if !contract.GitProvenance.Optional || contract.GitProvenance.Note == "" {
+		t.Fatal("contract must mark Git provenance optional with a non-substitution note")
 	}
 
 	schema, ok := decodeSchemaJSON(t, "schema/foundation-1.0.json").(map[string]any)
