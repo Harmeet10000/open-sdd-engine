@@ -114,7 +114,6 @@ func TestPolicySnapshotIsImmutableAndFaultable(t *testing.T) {
 	floor := []byte("floor: strict\n")
 	snapshot, err := engine.NewPolicySnapshot(engine.PolicySnapshotInput{
 		Source: "ci-policy/v3",
-		Digest: "sha256:policy",
 		Floor:  floor,
 	})
 	if err != nil {
@@ -129,8 +128,11 @@ func TestPolicySnapshotIsImmutableAndFaultable(t *testing.T) {
 	if string(snapshot.Floor())[0] == 'X' {
 		t.Fatal("policy floor accessor aliases stored bytes")
 	}
-	if snapshot.Source() != "ci-policy/v3" || snapshot.Digest() != "sha256:policy" {
+	if snapshot.Source() != "ci-policy/v3" {
 		t.Fatal("policy snapshot accessors lost input")
+	}
+	if snapshot.Digest() != engine.BlobDigest("sdd.policy-floor/1", []byte("floor: strict\n")) {
+		t.Fatalf("policy digest does not bind the observed bytes: %q", snapshot.Digest())
 	}
 
 	if _, emptyErr := engine.NewPolicySnapshot(engine.PolicySnapshotInput{}); !errors.Is(emptyErr, engine.ErrInvalidProtocolValue) {
@@ -142,7 +144,7 @@ func TestPolicySnapshotIsImmutableAndFaultable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if observed.Digest() != "sha256:policy" {
+	if observed.Digest() != snapshot.Digest() {
 		t.Fatalf("policy port did not return the canned snapshot: %#v", observed)
 	}
 	ctx, cancel := context.WithCancel(context.Background())

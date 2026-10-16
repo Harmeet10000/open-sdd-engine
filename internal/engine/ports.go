@@ -75,8 +75,10 @@ type Snapshotter interface {
 }
 
 // PolicySnapshot is a provisional immutable policy observation: source
-// identity plus the opaque policy floor bytes the engine plans against. Full
-// policy normalization and authority evaluation (IC-10) belong to
+// identity plus the opaque policy floor bytes the engine plans against. The
+// digest is computed over the observed bytes, never accepted from the
+// caller, so a plan can only bind bytes and not names. Full policy
+// normalization and authority evaluation (IC-10) belong to
 // artifact-validation; this value carries facts, not decisions.
 type PolicySnapshot struct {
 	source string
@@ -87,17 +89,20 @@ type PolicySnapshot struct {
 // PolicySnapshotInput constructs a PolicySnapshot.
 type PolicySnapshotInput struct {
 	Source string
-	Digest string
 	Floor  []byte
 }
 
 // NewPolicySnapshot validates source identity and defensively copies the floor.
 func NewPolicySnapshot(input PolicySnapshotInput) (PolicySnapshot, error) {
-	if input.Source == "" || input.Digest == "" {
-		return PolicySnapshot{}, fmt.Errorf("%w: policy source and digest are required", ErrInvalidProtocolValue)
+	if input.Source == "" {
+		return PolicySnapshot{}, fmt.Errorf("%w: policy source is required", ErrInvalidProtocolValue)
 	}
 	floor := append([]byte{}, input.Floor...)
-	return PolicySnapshot{source: input.Source, digest: input.Digest, floor: floor}, nil
+	return PolicySnapshot{
+		source: input.Source,
+		digest: BlobDigest("sdd.policy-floor/1", floor),
+		floor:  floor,
+	}, nil
 }
 
 // Source reports the trusted-source identity the floor was read from.
