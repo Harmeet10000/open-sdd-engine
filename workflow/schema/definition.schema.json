@@ -1,0 +1,284 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:open-sdd:workflow-definition:1",
+  "title": "Open SDD workflow definition version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "definitionId",
+    "semanticVersion",
+    "canonicalizer",
+    "factTypes",
+    "nodes",
+    "edges",
+    "mandatoryGateIds",
+    "compatibilityRules"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "definitionId": { "$ref": "#/definitions/stableId" },
+    "semanticVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "canonicalizer": { "$ref": "#/definitions/canonicalizer" },
+    "description": { "type": "string", "maxLength": 65536 },
+    "factTypes": {
+      "type": "array",
+      "maxItems": 32768,
+      "items": { "$ref": "#/definitions/factType" }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2048,
+      "items": { "$ref": "#/definitions/node" }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 8192,
+      "items": { "$ref": "#/definitions/edge" }
+    },
+    "mandatoryGateIds": {
+      "type": "array",
+      "maxItems": 2048,
+      "items": { "$ref": "#/definitions/stableId" }
+    },
+    "compatibilityRules": {
+      "type": "array",
+      "maxItems": 2048,
+      "items": { "$ref": "#/definitions/compatibilityRule" }
+    }
+  },
+  "definitions": {
+    "stableId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "typeRef": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9._-]*/[a-z][a-z0-9._-]*@[1-9][0-9]*$"
+    },
+    "coordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "maxLength": 4096 },
+        "field": { "type": "string", "maxLength": 4096 },
+        "startLine": { "type": "integer", "minimum": 1 },
+        "startColumn": { "type": "integer", "minimum": 1 },
+        "endLine": { "type": "integer", "minimum": 1 },
+        "endColumn": { "type": "integer", "minimum": 1 },
+        "unit": { "enum": ["utf8-byte", "unicode-scalar"] }
+      }
+    },
+    "canonicalizer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "definitionDigest"],
+      "properties": {
+        "id": { "const": "sdd.workflow.canonical-json" },
+        "version": { "const": "1" },
+        "definitionDigest": { "$ref": "#/definitions/sha256" }
+      }
+    },
+    "factType": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "kind", "owner", "source"],
+      "properties": {
+        "key": { "$ref": "#/definitions/stableId" },
+        "kind": { "enum": ["bool", "enum", "integer", "presence"] },
+        "enumValues": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "maxLength": 512 }
+        },
+        "minimum": { "type": "integer" },
+        "maximum": { "type": "integer" },
+        "owner": { "$ref": "#/definitions/stableId" },
+        "source": { "$ref": "#/definitions/coordinate" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "enum" } } },
+          "then": { "required": ["enumValues"] },
+          "else": { "not": { "required": ["enumValues"] } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "integer" } } },
+          "then": { "required": ["minimum", "maximum"] },
+          "else": {
+            "allOf": [
+              { "not": { "required": ["minimum"] } },
+              { "not": { "required": ["maximum"] } }
+            ]
+          }
+        }
+      ]
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "direction", "typeRef", "cardinality", "source"],
+      "properties": {
+        "name": { "$ref": "#/definitions/stableId" },
+        "direction": { "enum": ["input", "output"] },
+        "typeRef": { "$ref": "#/definitions/typeRef" },
+        "cardinality": { "enum": ["one", "zero-or-one", "zero-or-many", "at-least-one"] },
+        "source": { "$ref": "#/definitions/coordinate" }
+      }
+    },
+    "portReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeId", "portName"],
+      "properties": {
+        "nodeId": { "$ref": "#/definitions/stableId" },
+        "portName": { "$ref": "#/definitions/stableId" }
+      }
+    },
+    "scalar": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bool": { "type": "boolean" },
+        "enum": { "type": "string", "maxLength": 512 },
+        "integer": { "type": "integer" }
+      },
+      "oneOf": [
+        { "required": ["bool"] },
+        { "required": ["enum"] },
+        { "required": ["integer"] }
+      ]
+    },
+    "expression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "source"],
+      "properties": {
+        "kind": { "enum": ["const", "bool-fact", "present", "equal", "not-equal", "in", "compare", "not", "all", "any"] },
+        "factKey": { "$ref": "#/definitions/stableId" },
+        "const": { "type": "boolean" },
+        "value": { "$ref": "#/definitions/scalar" },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": { "$ref": "#/definitions/scalar" }
+        },
+        "operator": { "enum": ["lt", "le", "gt", "ge"] },
+        "operand": { "$ref": "#/definitions/expression" },
+        "operands": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": { "$ref": "#/definitions/expression" }
+        },
+        "source": { "$ref": "#/definitions/coordinate" }
+      },
+      "oneOf": [
+        {
+          "properties": { "kind": { "const": "const" } },
+          "required": ["const"],
+          "not": { "anyOf": [{ "required": ["factKey"] }, { "required": ["value"] }, { "required": ["values"] }, { "required": ["operator"] }, { "required": ["operand"] }, { "required": ["operands"] }] }
+        },
+        {
+          "properties": { "kind": { "const": "bool-fact" } },
+          "required": ["factKey"],
+          "not": { "anyOf": [{ "required": ["const"] }, { "required": ["value"] }, { "required": ["values"] }, { "required": ["operator"] }, { "required": ["operand"] }, { "required": ["operands"] }] }
+        },
+        {
+          "properties": { "kind": { "const": "present" } },
+          "required": ["factKey"],
+          "not": { "anyOf": [{ "required": ["const"] }, { "required": ["value"] }, { "required": ["values"] }, { "required": ["operator"] }, { "required": ["operand"] }, { "required": ["operands"] }] }
+        },
+        {
+          "properties": { "kind": { "enum": ["equal", "not-equal"] } },
+          "required": ["factKey", "value"],
+          "not": { "anyOf": [{ "required": ["const"] }, { "required": ["values"] }, { "required": ["operator"] }, { "required": ["operand"] }, { "required": ["operands"] }] }
+        },
+        {
+          "properties": { "kind": { "const": "in" } },
+          "required": ["factKey", "values"],
+          "not": { "anyOf": [{ "required": ["const"] }, { "required": ["value"] }, { "required": ["operator"] }, { "required": ["operand"] }, { "required": ["operands"] }] }
+        },
+        {
+          "properties": { "kind": { "const": "compare" } },
+          "required": ["factKey", "value", "operator"],
+          "not": { "anyOf": [{ "required": ["const"] }, { "required": ["values"] }, { "required": ["operand"] }, { "required": ["operands"] }] }
+        },
+        {
+          "properties": { "kind": { "const": "not" } },
+          "required": ["operand"],
+          "not": { "anyOf": [{ "required": ["factKey"] }, { "required": ["const"] }, { "required": ["value"] }, { "required": ["values"] }, { "required": ["operator"] }, { "required": ["operands"] }] }
+        },
+        {
+          "properties": { "kind": { "enum": ["all", "any"] } },
+          "required": ["operands"],
+          "not": { "anyOf": [{ "required": ["factKey"] }, { "required": ["const"] }, { "required": ["value"] }, { "required": ["values"] }, { "required": ["operator"] }, { "required": ["operand"] }] }
+        }
+      ]
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "source"],
+      "properties": {
+        "id": { "$ref": "#/definitions/stableId" },
+        "kind": { "enum": ["submit", "assess", "execute", "accept-composition", "handoff-completion"] },
+        "submissionTypeRef": { "$ref": "#/definitions/typeRef" },
+        "validatorBinding": { "$ref": "#/definitions/stableId" },
+        "executionBinding": { "$ref": "#/definitions/stableId" },
+        "remediationTemplate": { "type": "string", "maxLength": 65536 },
+        "source": { "$ref": "#/definitions/coordinate" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "kind", "inputs", "outputs", "requiredGateIds", "profileBinding", "action", "source"],
+      "properties": {
+        "id": { "$ref": "#/definitions/stableId" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "kind": { "enum": ["authored", "assessment", "execution", "gate", "handoff"] },
+        "description": { "type": "string", "maxLength": 65536 },
+        "inputs": { "type": "array", "maxItems": 16384, "items": { "$ref": "#/definitions/port" } },
+        "outputs": { "type": "array", "maxItems": 16384, "items": { "$ref": "#/definitions/port" } },
+        "applicabilityPredicate": { "$ref": "#/definitions/expression" },
+        "skipPredicate": { "$ref": "#/definitions/expression" },
+        "requiredGateIds": { "type": "array", "maxItems": 2048, "items": { "$ref": "#/definitions/stableId" } },
+        "profileBinding": { "$ref": "#/definitions/stableId" },
+        "action": { "$ref": "#/definitions/action" },
+        "source": { "$ref": "#/definitions/coordinate" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "target", "relation", "coordinate"],
+      "properties": {
+        "id": { "$ref": "#/definitions/stableId" },
+        "source": { "$ref": "#/definitions/portReference" },
+        "target": { "$ref": "#/definitions/portReference" },
+        "relation": { "enum": ["dependency", "freshness"] },
+        "predicate": { "$ref": "#/definitions/expression" },
+        "coordinate": { "$ref": "#/definitions/coordinate" }
+      }
+    },
+    "compatibilityRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "digest"],
+      "properties": {
+        "id": { "$ref": "#/definitions/stableId" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "digest": { "$ref": "#/definitions/sha256" }
+      }
+    }
+  }
+}

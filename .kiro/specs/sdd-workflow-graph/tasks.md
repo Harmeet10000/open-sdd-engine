@@ -31,6 +31,27 @@ Fixture-based tests are not release evidence for an external owner contract:
 durability, process execution, authority, and completion remain blocked until
 their real producer/consumer conformance suites pass.
 
+### Implementation progress — 2026-10-17
+
+The first pure vertical slice is implemented under `internal/workflow` and
+`workflow/schema/definition.schema.json`. It currently provides the accepted
+closed JSON decoder/schema, exact/semantic/compiled identities, hard-limit
+enforcement, stable reference/type/cardinality checks, conservative dependency
+and mixed-readiness cycle rejection, strong-Kleene predicate evaluation,
+opaque typed facts, mandatory-gate and skip-authority safeguards, immutable
+node-result consumption, deterministic readiness/blockers, snapshot-bound
+action proposals, and completion handoff data.
+
+The implementation has passed package lint, race tests, full repository tests,
+the Draft-07 offline schema test, and Windows cross-compilation. These are
+implementation facts, not completion claims. WG-TASK-001 remains unchecked
+because the foundation-owned engine result extension is not allocated.
+WG-TASK-002 through WG-TASK-004 remain unchecked because conditional valuation
+proofs, the complete impossible-route/dominator analysis, all normative fixture
+files, and the full conformance manifest are not yet complete. Real workspace,
+artifact-validation, completion, policy-authority, and bounded-execution
+consumer contracts remain their recorded release blockers.
+
 ## Tasks
 
 ### WG-TASK-001 — Walk one definition from compile to one engine proposal
