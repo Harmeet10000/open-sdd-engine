@@ -11,14 +11,17 @@ This is an implementation-planning checklist. The Kiro specification drafts and 
 
 ## Prerequisite ownership
 
-The four missing prerequisite specs must be drafted and accepted before `sdd-guided-workflows` is integrated. Do not infer or invent their implementations in this TODO.
+The four prerequisite spec directories now contain requirements, design, and
+task drafts. Presence is not acceptance: their owner-review checklists remain
+open, and implementation must not begin from an unresolved contract. All four
+must be accepted before `sdd-guided-workflows` is integrated.
 
 | Spec | Owns | Current planning status |
 |---|---|---|
-| `sdd-workspace-transactions` | Canonical paths, snapshots, revisions, locking, exact-plan application, idempotency, and crash recovery. | Missing prerequisite; draft and acceptance required. |
-| `sdd-workflow-graph` | Graph compilation, valid transitions, conditional gates, reachability, definition pinning, composition, and escalation. | Missing prerequisite; draft and acceptance required. |
-| `sdd-artifact-validation` | Artifact schemas, stable IDs, traceability, canonicalization, semantic/derivation digests, and validator execution. | Missing prerequisite; draft and acceptance required. |
-| `sdd-completion-lifecycle` | Candidate-bound evidence, approvals, DONE generation, receipt, promotion, archive, and post-verification edits. | Missing prerequisite; draft and acceptance required. |
+| `sdd-workspace-transactions` | Canonical paths, snapshots, revisions, locking, exact-plan application, idempotency, and crash recovery. | Requirements/design/tasks drafted; owner acceptance and implementation pending. |
+| `sdd-workflow-graph` | Graph compilation, valid transitions, conditional gates, reachability, definition pinning, composition, and escalation. | Requirements/design/tasks drafted; owner acceptance and implementation pending. |
+| `sdd-artifact-validation` | Artifact schemas, stable IDs, traceability, canonicalization, semantic/derivation digests, and validator execution. | Requirements/design/tasks drafted; owner acceptance and implementation pending. |
+| `sdd-completion-lifecycle` | Candidate-bound evidence, approvals, DONE generation, receipt, promotion, archive, and post-verification edits. | Requirements/design/tasks drafted; owner acceptance and implementation pending. |
 
 ## Existing specification drafts
 
@@ -32,12 +35,16 @@ These are reviewed/drafted inputs only. Drafting and review do not mean implemen
   - [requirements.md](.kiro/specs/sdd-guided-workflows/requirements.md)
   - [design.md](.kiro/specs/sdd-guided-workflows/design.md)
   - [tasks.md](.kiro/specs/sdd-guided-workflows/tasks.md)
+- [sdd-workspace-transactions directory](.kiro/specs/sdd-workspace-transactions/)
+- [sdd-workflow-graph directory](.kiro/specs/sdd-workflow-graph/)
+- [sdd-artifact-validation directory](.kiro/specs/sdd-artifact-validation/)
+- [sdd-completion-lifecycle directory](.kiro/specs/sdd-completion-lifecycle/)
 
 ## Ordered implementation TODO
 
 Complete in this order. Keep each item unchecked until the corresponding implementation and conformance evidence actually exists.
 
-- [ ] 1. `sdd-engine-foundation` — Implement the native Go executable, public protocol schemas, `Engine.Execute` seam, version/doctor/status slices, and inspectable `start --dry-run`; use the existing draft as design input, not as completion evidence.
+- [ ] 1. `sdd-engine-foundation` — Most vertical slices and verification are implemented. Keep open until FND-005 consumes one coherent raw snapshot and FND-007 connects real conflict/validation producers; the task file records the exact remaining evidence.
 - [ ] 2. `sdd-workspace-transactions` — Draft, accept, and implement canonical paths, immutable snapshots, revisions, locking, exact-plan application, idempotency, and crash recovery.
 - [ ] 3. `sdd-workflow-graph` — Draft, accept, and implement graph compilation, valid transitions, conditional gates, reachability, definition pinning, composition, and escalation.
 - [ ] 4. `sdd-artifact-validation` — Draft, accept, and implement artifact schemas, stable IDs, traceability, typed canonicalization, semantic/derivation digests, and authoritative validator execution.

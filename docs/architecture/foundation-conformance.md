@@ -96,6 +96,6 @@ foundation behavior:
   separator-bearing identities fail closed.
 - Native runtime tests pass on Ubuntu, macOS, and Windows; mutation support is
   still not claimed because foundation only observes and previews.
-- `todo.md` still describes prerequisite specs as missing; updating it to
-  the six-state model is follow-up work after company acceptance of the
-  decision record (PR #12).
+- `todo.md` distinguishes drafted prerequisite specs from owner acceptance
+  and implementation; no directory is treated as accepted merely because it
+  contains requirements/design/tasks files.
