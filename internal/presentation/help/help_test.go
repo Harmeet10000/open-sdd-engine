@@ -27,3 +27,11 @@ func TestHelpNamesOnlyImplementedCommands(t *testing.T) {
 		t.Fatal("help text must end in a newline and use spaces, not tabs")
 	}
 }
+
+func TestDoctorHelpUsesStableExitTaxonomy(t *testing.T) {
+	t.Parallel()
+
+	if !strings.Contains(help.DoctorHelp, "Exits 3") || !strings.Contains(help.DoctorHelp, "exits 6") {
+		t.Fatalf("doctor help does not distinguish workspace and policy exits:\n%s", help.DoctorHelp)
+	}
+}

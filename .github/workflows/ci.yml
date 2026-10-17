@@ -146,6 +146,110 @@ jobs:
       - name: Coverage threshold
         run: make coverage
 
+  smoke:
+    name: Native runtime smoke (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Build with fixed metadata
+        run: >-
+          go build -mod=readonly -trimpath
+          -ldflags "-X main.version=0.1.0-test -X main.commit=test -X main.buildTime=1970-01-01T00:00:00Z"
+          -o "${{ runner.temp }}/sdd" ./cmd/sdd
+
+      - name: Smoke the native binary with absolute paths
+        run: |
+          set -euo pipefail
+          BIN="${{ runner.temp }}/sdd"
+          "$BIN" --version
+          EMPTY="$(mktemp -d)"
+          cd "$EMPTY"
+          "$BIN" version --json
+          code=0; "$BIN" status || code=$?
+          test "$code" -eq 3
+          code=0; "$BIN" doctor || code=$?
+          test "$code" -eq 3
+          code=0; "$BIN" bogus || code=$?
+          test "$code" -eq 2
+          WORK="$(mktemp -d)"
+          mkdir -p "$WORK/.sdd/work/apple"
+          printf 'formatVersion: 1\nworkspaceId: ws-1\nrevision: 11\n' > "$WORK/.sdd/workspace.yaml"
+          printf 'schemaVersion: 1\nworkId: work-1\nslug: apple\nrevision: 5\nstatus: active\ncomposition: quick-spec\n' > "$WORK/.sdd/work/apple/work.yaml"
+          cd "$WORK"
+          "$BIN" status
+          "$BIN" doctor --json
+          "$BIN" start --dry-run "smoke intent" --json
+
+  cross-build:
+    name: Cross-compile only (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Compile without runtime claims
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: go build -mod=readonly -trimpath ./...
+
+  reproducible-build:
+    name: Reproducible build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Build twice with fixed inputs and compare
+        run: |
+          set -euo pipefail
+          build_flags=(
+            -mod=readonly -trimpath
+            -ldflags "-X main.version=0.1.0-test -X main.commit=test -X main.buildTime=1970-01-01T00:00:00Z"
+          )
+          go build "${build_flags[@]}" -o "${{ runner.temp }}/sdd-a" ./cmd/sdd
+          go build "${build_flags[@]}" -o "${{ runner.temp }}/sdd-b" ./cmd/sdd
+          cmp "${{ runner.temp }}/sdd-a" "${{ runner.temp }}/sdd-b"
+
   lint:
     name: Lint
     runs-on: ubuntu-24.04
@@ -177,6 +281,9 @@ jobs:
       - platform-test
       - race-and-coverage
       - lint
+      - smoke
+      - cross-build
+      - reproducible-build
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -188,6 +295,9 @@ jobs:
           PLATFORM_RESULT: ${{ needs.platform-test.result }}
           RACE_RESULT: ${{ needs.race-and-coverage.result }}
           LINT_RESULT: ${{ needs.lint.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+          CROSS_RESULT: ${{ needs.cross-build.result }}
+          REPRO_RESULT: ${{ needs.reproducible-build.result }}
         run: |
           if [[ "$POLICY_RESULT" != "success" && "$POLICY_RESULT" != "skipped" ]]; then
             exit 1
@@ -197,3 +307,6 @@ jobs:
           [[ "$PLATFORM_RESULT" == "success" ]]
           [[ "$RACE_RESULT" == "success" ]]
           [[ "$LINT_RESULT" == "success" ]]
+          [[ "$SMOKE_RESULT" == "success" ]]
+          [[ "$CROSS_RESULT" == "success" ]]
+          [[ "$REPRO_RESULT" == "success" ]]

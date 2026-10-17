@@ -60,7 +60,7 @@ func Execute(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, arg
 			fmt.Fprintln(stderr, "engine unavailable")
 			return 1
 		}
-		return renderOutcomeFor(stdout, stderr, eng, jsonFlagOf(argv), outputFlagOf(argv), env,
+		return renderOutcomeFor(stdout, stderr, fallback, jsonFlagOf(argv), outputFlagOf(argv), env,
 			fallback.UsageError(engine.Command{}, "invalid engine configuration"))
 	}
 
@@ -273,9 +273,10 @@ func cliFailure(stdout, stderr io.Writer, argv []string, env Env, eng *engine.En
 }
 
 // unknownName extracts the unknown command token, skipping known flags and
-// their values so leading options cannot hide it. Unknown flags are skipped
-// as bare tokens; a value-looking token after one may still be extracted,
-// which is the best available reading of ambiguous input.
+// their values so leading options cannot hide it. Once an unknown flag is
+// observed, later bare tokens are ambiguous flag values and are never copied
+// into the outcome. This fail-closed rule prevents credentials supplied to a
+// misspelled or unsupported option from leaking as requestedCommand.
 func unknownName(argv []string) string {
 	valueFlags := map[string]bool{
 		"--output": true, "--root": true, "--work": true, "--workflow": true,
@@ -284,9 +285,13 @@ func unknownName(argv []string) string {
 		"--json": true, "--dry-run": true, "-h": true, "--help": true, "--version": true,
 	}
 	tokens := preFlagTokens(argv)
+	unknownFlag := false
 	for index := 0; index < len(tokens); index++ {
 		token := tokens[index]
 		if !strings.HasPrefix(token, "-") || token == "-" {
+			if unknownFlag {
+				continue
+			}
 			if !isKnownCommand(token) {
 				return token
 			}
@@ -301,7 +306,9 @@ func unknownName(argv []string) string {
 		}
 		if valueFlags[token] {
 			index++
+			continue
 		}
+		unknownFlag = true
 	}
 	return ""
 }

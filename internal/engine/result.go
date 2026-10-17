@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"sdd.dev/sdd/internal/workspace"
 )
 
 var digestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
@@ -84,20 +86,19 @@ type StatusResult struct {
 	workItems []WorkRef
 }
 
-// NewStatusResult builds a status result. Zero work references (empty ID
-// or slug) are dropped so constructed results always satisfy the schema;
-// callers holding invalid references have a builder bug, and silent loss
-// here is safer than emitting an unpublishable envelope.
-func NewStatusResult(workItems []WorkRef) Result {
+// NewStatusResult builds a status result and rejects invalid references.
+// Dropping a malformed item would turn an observation/assembly defect into a
+// successful but incomplete status response, which is silent data loss.
+func NewStatusResult(workItems []WorkRef) (Result, error) {
 	items := make([]WorkRef, 0, len(workItems))
-	for _, item := range workItems {
+	for index, item := range workItems {
 		if item.ID() == "" || item.Slug() == "" {
-			continue
+			return Result{}, fmt.Errorf("%w: status work item %d has an empty ID or slug", ErrInvalidProtocolValue, index)
 		}
 		items = append(items, item)
 	}
 	value := StatusResult{workItems: items}
-	return Result{kind: ResultStatus, status: &value}
+	return Result{kind: ResultStatus, status: &value}, nil
 }
 
 func (r StatusResult) WorkItems() []WorkRef {
@@ -228,8 +229,8 @@ type PlanOperationInput struct {
 }
 
 func NewPlanOperation(input PlanOperationInput) (PlanOperation, error) {
-	if strings.TrimSpace(input.Path) == "" {
-		return PlanOperation{}, fmt.Errorf("%w: plan operation path is required", ErrInvalidProtocolValue)
+	if !validRepositoryPath(input.Path) {
+		return PlanOperation{}, fmt.Errorf("%w: plan operation path must be canonical and repository-relative", ErrInvalidProtocolValue)
 	}
 	switch input.Kind {
 	case OperationCreateFile:
@@ -309,8 +310,8 @@ type PlanPreconditionInput struct {
 }
 
 func NewPlanPrecondition(input PlanPreconditionInput) (PlanPrecondition, error) {
-	if strings.TrimSpace(input.Path) == "" {
-		return PlanPrecondition{}, fmt.Errorf("%w: plan precondition path is required", ErrInvalidProtocolValue)
+	if !validRepositoryPath(input.Path) {
+		return PlanPrecondition{}, fmt.Errorf("%w: plan precondition path must be canonical and repository-relative", ErrInvalidProtocolValue)
 	}
 	switch input.Kind {
 	case PreconditionRevision, PreconditionAbsent:
@@ -560,6 +561,16 @@ func (r Result) MarshalJSON() ([]byte, error) {
 
 func validDigest(value string) bool {
 	return digestPattern.MatchString(value)
+}
+
+// validRepositoryPath accepts the protocol's portable path form: slash-
+// separated, relative to the workspace root, and already normalized. It is
+// intentionally stricter than either host filesystem so a plan created on
+// Unix cannot become absolute or escape its workspace when applied on
+// Windows (or vice versa).
+func validRepositoryPath(value string) bool {
+	_, err := workspace.ParseWorkspacePath(value)
+	return err == nil
 }
 
 func cloneMutationPlan(plan MutationPlan) MutationPlan {

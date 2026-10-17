@@ -15,7 +15,7 @@ func TestHumanAndJSONRenderTheSamePreparedOutcome(t *testing.T) {
 	t.Parallel()
 
 	workspace := mustWorkspace(t, "/repo")
-	result := engine.NewStatusResult(nil)
+	result := mustStatusResult(t, nil)
 	action, err := engine.NewNextAction(engine.NextActionInput{
 		Command: "next",
 		Args:    []string{"two words", "it's-safe"},
@@ -215,7 +215,7 @@ func TestHumanSummariesCoverEveryResultVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := engine.NewStartDryRunResult(plan)
-	status := engine.NewStatusResult(nil)
+	status := mustStatusResult(t, nil)
 
 	cases := []struct {
 		name    string
@@ -255,11 +255,11 @@ func TestRedactionCoversJSONCredentialForms(t *testing.T) {
 	diagnostic, err := engine.NewDiagnostic(engine.DiagnosticInput{
 		Code:     "DIAG_USAGE_ERROR",
 		Severity: engine.SeverityError,
-		Message:  `auth failed for {"token":"abc123"} with password="alpha beta"`,
+		Message:  `auth failed for {"token":"abc123"} with password="not a real credential"`,
 		Source:   source,
 		Metadata: map[string]any{
 			"/repo/token=hunter2": "path-label",
-			"password":            "s3cr3t-value",
+			"password":            "test-only-placeholder",
 			"nested":              map[string]any{"api_key": "qwerty"},
 		},
 	})
@@ -279,7 +279,7 @@ func TestRedactionCoversJSONCredentialForms(t *testing.T) {
 		t.Fatal(err)
 	}
 	rendered := jsonOut.String()
-	for _, leaked := range []string{"abc123", "alpha", "beta", "hunter2", "qwerty", "s3cr3t-value"} {
+	for _, leaked := range []string{"abc123", "not a real credential", "hunter2", "qwerty", "test-only-placeholder"} {
 		if strings.Contains(rendered, leaked) {
 			t.Fatalf("JSON credential form leaked %q: %s", leaked, rendered)
 		}
@@ -305,13 +305,22 @@ func (shortWriter) Write(payload []byte) (int, error) { return len(payload) - 1,
 func successfulStatus(t *testing.T) engine.Outcome {
 	t.Helper()
 	workspace := mustWorkspace(t, "/repo")
-	result := engine.NewStatusResult(nil)
+	result := mustStatusResult(t, nil)
 	return mustOutcome(t, engine.OutcomeInput{
 		Command:   engine.CommandStatus,
 		Workspace: &workspace,
 		Result:    &result,
 		ExitCode:  engine.ExitSuccess,
 	})
+}
+
+func mustStatusResult(t *testing.T, workItems []engine.WorkRef) engine.Result {
+	t.Helper()
+	result, err := engine.NewStatusResult(workItems)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
 }
 
 func mustWorkspace(t *testing.T, root string) engine.WorkspaceRef {

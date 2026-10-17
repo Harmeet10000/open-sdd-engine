@@ -68,7 +68,10 @@ func TestRenderedOutcomesConformToPublishedSchema(t *testing.T) {
 func statusOutcome(t *testing.T) engine.Outcome {
 	t.Helper()
 	workspace := conformanceWorkspace(t)
-	result := engine.NewStatusResult(nil)
+	result, err := engine.NewStatusResult(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return conformanceOutcome(t, engine.OutcomeInput{
 		Command:   engine.CommandStatus,
 		Workspace: &workspace,

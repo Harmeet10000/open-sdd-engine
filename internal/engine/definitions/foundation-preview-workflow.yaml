@@ -1,0 +1,9 @@
+schemaVersion: 1
+definitionId: foundation-preview-workflow
+capability: preview-work-record
+authorizable: false
+operations:
+  - create-work-manifest
+notes:
+  - The requested workflow name is bound separately into the effective definition digest.
+  - Durable application is owned by workspace transactions and is unavailable in foundation.
