@@ -369,6 +369,7 @@ type AuthorizationFact struct {
 	ExpiresAt     time.Time
 	Revoked       bool
 	RevocationID  string
+	FactDigest    Digest
 }
 
 // VerifyAuthorization checks binding and freshness immediately before
@@ -377,7 +378,7 @@ func VerifyAuthorization(plan Plan, fact AuthorizationFact, now time.Time) error
 	scope := plan.AuthorizationScope()
 	if fact.ProviderID != scope.ProviderID || fact.PrincipalID != scope.PrincipalID || fact.Scope != scope.Scope ||
 		fact.PlanDigest != plan.Digest() || fact.PolicyDigest != scope.PolicyDigest || fact.PolicyVersion != scope.PolicyVersion ||
-		fact.GrantKind != scope.GrantKind || !validPlanIdentity(fact.GrantID) {
+		fact.GrantKind != scope.GrantKind || !validPlanIdentity(fact.GrantID) || !validSHA256Digest(fact.FactDigest) {
 		return fmt.Errorf("%w: grant does not bind the exact plan and scope", ErrAuthorizationInvalid)
 	}
 	if fact.Revoked {

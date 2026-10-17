@@ -63,6 +63,10 @@ const (
 // Digest is a domain-separated content identity encoded as algorithm:hex.
 type Digest string
 
+// RawBlobDigest returns the exact byte identity used by snapshots and mutation
+// content references. It carries no artifact semantic meaning.
+func RawBlobDigest(value []byte) Digest { return digestBytes("sdd.raw-blob/1", value) }
+
 // WorkspacePath is normalized POSIX text relative to the workspace root.
 type WorkspacePath string
 
@@ -385,7 +389,7 @@ func normalizeObservation(observation *PathObservation) error {
 		if observation.Kind == FileKindRegular && uint64(len(observation.Bytes)) != observation.Size {
 			return fmt.Errorf("%w: path %q size does not match bytes", ErrSnapshotInvalid, observation.Path)
 		}
-		want := digestBytes("sdd.raw-blob/1", observation.Bytes)
+		want := RawBlobDigest(observation.Bytes)
 		if observation.BlobDigest != "" && observation.BlobDigest != want {
 			return fmt.Errorf("%w: path %q blob digest mismatch", ErrSnapshotInvalid, observation.Path)
 		}

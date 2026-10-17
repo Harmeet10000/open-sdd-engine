@@ -189,9 +189,10 @@ func validAuthorization(plan Plan, now time.Time) AuthorizationFact {
 		ProviderID: scope.ProviderID, GrantID: "grant-1", PrincipalID: scope.PrincipalID, Scope: scope.Scope,
 		PlanDigest: plan.Digest(), PolicyDigest: scope.PolicyDigest, PolicyVersion: scope.PolicyVersion, GrantKind: scope.GrantKind,
 		IssuedAt: now.Add(-time.Minute), NotBefore: now.Add(-time.Minute), ExpiresAt: now.Add(time.Minute),
+		FactDigest: sha256Of("authorization-fact"),
 	}
 }
 
 func sha256Of(value string) Digest { return sha256OfBytes([]byte(value)) }
 
-func sha256OfBytes(value []byte) Digest { return digestBytes("test/1", value) }
+func sha256OfBytes(value []byte) Digest { return RawBlobDigest(value) }

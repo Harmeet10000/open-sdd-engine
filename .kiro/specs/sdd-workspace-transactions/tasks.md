@@ -54,12 +54,18 @@ separately as external dependencies. Test drivers belong beside Go packages as
   preconditions, fixed revision intents, bounded staged content, a reusable
   typed canonical-JSON codec, a domain-separated plan digest, non-circular
   authorization/freshness verification, defensive copying, and the accepted
-  transaction transition table. Tests prove effect order changes identity,
-  grant IDs are excluded from plan identity, stale/revoked/mismatched grants
-  fail closed, and `PREPARED` cannot transition to `FAILED`. This task remains
-  unchecked: content submission, idempotency records, locking, durable
-  `PENDING`/staging/`PREPARED`, install, journal, committed summary, outcome,
-  replay, and recovery adapters are not yet implemented.
+  transaction transition table. A pure apply/recovery driver now validates and
+  owns content bytes, computes a retry-time-independent request fingerprint,
+  rechecks the coherent read-set and authorization at the last reversible
+  boundary, emits one closed persistence action at a time, recognizes an exact
+  installed postcondition after lost progress, and quarantines a third state.
+  Tests prove effect order changes identity, grant IDs are excluded from plan
+  identity, stale/revoked/mismatched grants fail closed, guarded actions cannot
+  be fabricated outside the package, and `PREPARED` cannot transition to
+  `FAILED`. This task remains unchecked: durable idempotency lookup, locking,
+  filesystem persistence of `PENDING`/staging/`PREPARED`, target install,
+  journal, committed summary/outcome, and platform recovery adapters are not
+  yet implemented.
 
 ### WS-TASK-003 — Add update/delete revisions, tombstones, and stale-writer safety
 
