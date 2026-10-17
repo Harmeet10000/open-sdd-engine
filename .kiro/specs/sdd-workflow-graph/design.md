@@ -1,10 +1,10 @@
 # Design Document: sdd-workflow-graph
 
-## Draft status and design stance
+## Status and design stance
 
-This is a provisional design derived from `requirements.md`. It is not evidence
-of user acceptance, implementation, a released schema, or a company trust
-decision. The public result additions below are proposals for the single
+This pure-module design is accepted for implementation by ADR-0007. Acceptance
+is not evidence of implementation, a released public schema, or a company trust
+decision. The public result additions below remain proposals for the single
 foundation-owned minor protocol extension in AM-02; this document deliberately
 does **not** assign that extension a version number.
 
@@ -54,19 +54,20 @@ surface is:
 ```go
 package workflow
 
-func Compile(source DefinitionSource, limits CompileLimits) (CompiledGraph, []Diagnostic)
+func Compile(ctx context.Context, source DefinitionSource, limits CompileLimits) (CompiledGraph, []Diagnostic)
 
-func ResolveComposition(input CompositionInput) (CompositionDecision, []Diagnostic)
+func ResolveComposition(ctx context.Context, input CompositionInput) (CompositionDecision, []Diagnostic)
 
-func Evaluate(graph CompiledGraph, input EvaluationInput, options EvaluateOptions) Evaluation
+func Evaluate(ctx context.Context, graph CompiledGraph, input EvaluationInput, options EvaluateOptions) Evaluation
 ```
 
-`Compile` and `ResolveComposition` return diagnostics because invalid input is
-an expected domain result. Operational decoder/invariant defects are ordinary
-Go errors at the engine boundary; they are not represented by a generic result
-monad. `Evaluate` accepts only a successfully compiled graph and a validated
-immutable fact set. It always returns an evaluation, including a blocked or
-stale one.
+The context is cancellation/deadline control only; context values never affect
+semantic output or identity. `Compile` and `ResolveComposition` return
+diagnostics because invalid input is an expected domain result. Operational
+decoder/invariant defects are ordinary Go errors at the engine boundary; they
+are not represented by a generic result monad. `Evaluate` accepts only a
+successfully compiled graph and a validated immutable fact set. It always
+returns an evaluation, including a blocked or stale one.
 
 No interface is introduced for graph algorithms, predicate evaluation,
 canonical encoding, or digest calculation. They are in-process logic. The
@@ -103,7 +104,11 @@ validation routes.
 
 ## Closed definition language
 
-The graph language has one normative typed model. `DefinitionSource` contains
+The graph language has one normative typed model. Version 1 uses media type
+`application/vnd.open-sdd.workflow-definition+json;version=1`, schema ID
+`urn:open-sdd:workflow-definition:1`, canonicalizer
+`sdd.workflow.canonical-json/1`, and compiler contract
+`sdd.workflow.compiler/1`, as accepted by ADR-0007. `DefinitionSource` contains
 exact source bytes, a declared media/schema identity, and a workspace-relative
 source coordinate. The first implementation publishes a closed JSON Schema at
 `workflow/schema/definition.schema.json`; a different serialization requires a
@@ -303,9 +308,9 @@ hard atom and proof-step limit. Exhausting it returns
 `WORKFLOW_COMPILE_ANALYSIS_LIMIT`; compilation never falls back to an
 unbounded solver or punts an unproved safety invariant to runtime.
 
-### Provisional hard limits
+### Accepted hard safety limits
 
-These reviewable defaults make the complexity promise concrete. A pinned
+These conservative ceilings make the complexity promise concrete. A pinned
 profile may lower but never raise them. Changing a hard maximum changes the
 compiler-contract identity and requires compatibility fixtures.
 
@@ -868,22 +873,22 @@ authored-node evaluation.
 - No second public envelope, hidden network resolution, embedded model,
   arbitrary plugin runtime, Git mutation, auto-fix, or automatic migration.
 
-## Open decisions
+## External release decisions
 
 1. DEC-01/03/06 must select trusted policy/assessment/waiver issuers,
    revocation and retention. Injectable explicit facts are used until then.
 2. DEC-05/AM-01/AM-02 must allocate the shared protocol extension and severity
    treatment before public schema fixtures can freeze.
-3. The provisional hard limits above require corpus/benchmark review. Lowering
-   them is compatible only when affected definitions already fit; raising them
-   changes compiler-contract identity.
+3. The hard limits above are accepted safety ceilings. Corpus/benchmark review
+   may propose a new compiler-contract revision or lower deployment limits; it
+   cannot enable an unbounded fallback.
 4. Workspace must publish IC-01/02/03 concrete types and real adapter tests.
 5. Completion must publish IC-11/12 candidate/gate facts. Bounded execution
    must publish execution-attempt/result/claim facts. Their absence blocks only
    their dependent routes and production release claims.
-6. The first graph-definition serialization and schema ID must be approved
-   with built-in definition migration fixtures; the typed language and digest
-   projection above remain the compatibility contract regardless of encoding.
+6. ADR-0007 approves the first graph-definition JSON serialization, schema ID,
+   canonicalizer identity, and compiler-contract identity. Future encodings or
+   semantic changes require explicit migration fixtures.
 
 ## References
 

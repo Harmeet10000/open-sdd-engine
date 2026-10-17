@@ -1,11 +1,11 @@
 # Implementation Tasks: sdd-workflow-graph
 
-## Draft status, scope, and execution rule
+## Status, scope, and execution rule
 
-This is a provisional implementation plan derived from the proposed
-`requirements.md` and `design.md`. It is not evidence that the requirements,
-design, public schema amendment, implementation, fixtures, or integrations have
-been accepted or completed. Every implementation checkbox remains unchecked.
+This implementation plan is accepted by ADR-0007. Acceptance is not evidence
+that a public schema amendment, implementation, fixture, or integration is
+complete. Every implementation checkbox remains unchecked until its observable
+outcome and verification are actually satisfied.
 
 The workflow graph is one deep, pure module. Its supported implementation
 surface is `workflow.Compile`, `workflow.ResolveComposition`, and
@@ -252,7 +252,7 @@ self-dependency, duplicate edge, or cycle.
 | WG-BLK-004 | IC-11/IC-12 and WG-A-004: completion candidate/evidence/gate and completion-handoff schemas plus completion consumer conformance | WG-TASK-007, WG-TASK-012, WG-TASK-014 | Handoff shape may be tested; no DONE, receipt, promotion, archive, or completion claim. |
 | WG-BLK-005 | WG-A-005: bounded-execution versioned execution-attempt/result/claim facts and real process-provider contract tests | WG-TASK-005, WG-TASK-012, WG-TASK-014 | Authored/structural paths remain implementable; execution routes stay unavailable and fail closed in production. |
 | WG-BLK-006 | DEC-01/DEC-03/DEC-06: trusted policy/assessment/reviewer/waiver issuers, revocation, retention, privacy, and independence decisions | WG-TASK-008, WG-TASK-010, WG-TASK-012, WG-TASK-014 | Explicit injectable facts support tests; no organization-governed authority claim. |
-| WG-BLK-007 | Approved graph serialization/schema ID, compiler-contract version, and corpus-backed hard-limit review | WG-TASK-002, WG-TASK-003, WG-TASK-009, WG-TASK-012, WG-TASK-014 | Provisional implementation/fixtures must record the selected draft identity and cannot freeze compatibility. |
+| WG-BLK-007 | ADR-0007 fixes graph JSON serialization/schema ID, canonicalizer/compiler-contract identities, and hard safety ceilings; production deployment profiles still require corpus/benchmark review | WG-TASK-002, WG-TASK-003, WG-TASK-009, WG-TASK-012, WG-TASK-014 | Pure implementation uses the accepted identities and ceilings. Performance evidence may propose a reviewed contract revision but cannot silently change compatibility or remove bounds. |
 
 ## Exact amendments required in existing guided consumer tasks
 

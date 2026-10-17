@@ -2,11 +2,12 @@
 
 ## Status and scope
 
-This is a proposed, reviewable requirements draft. It is not evidence of
-acceptance or implementation. It defines the generic declarative graph/compiler
-and deterministic state evaluation seam used by `sdd`. It does not define the
-Bug Fix or Quick Spec journey contents, durable file transactions, artifact
-parsing, process execution, claims/leases, or completion/DONE generation.
+This requirements contract is accepted for implementation by ADR-0007. Its
+acceptance is not evidence of implementation or public protocol publication.
+It defines the generic declarative graph/compiler and deterministic state
+evaluation seam used by `sdd`. It does not define the Bug Fix or Quick Spec
+journey contents, durable file transactions, artifact parsing, process
+execution, claims/leases, or completion/DONE generation.
 
 The graph is a deep module: callers provide a pinned definition and an
 immutable fact snapshot; the graph returns compiled identity, typed state
@@ -508,9 +509,11 @@ These are distinct from module import/effect dependencies: graph imports only
 versioned value contracts; workspace does not import graph or completion policy;
 engine coordinates values.
 
-Requirements approval is blocked on WG-C-001, WG-C-004, WG-C-006, WG-C-007,
-WG-C-008, and WG-C-009 being versioned with their owner specs. The following
-amendments are proposed rather than silently applied:
+Pure graph requirements are accepted. Production integration and public release
+remain blocked on WG-C-004, WG-C-006, WG-C-008, and WG-C-009 being versioned
+with their owner specs; WG-C-001 and WG-C-007 consume the accepted workspace
+contract but still require real adapter conformance. The following amendments
+remain explicit owner work rather than being silently applied:
 
 | Amendment | Owner/path | Proposed change | Compatibility/tests |
 |---|---|---|---|
@@ -533,14 +536,16 @@ amendments are proposed rather than silently applied:
 - `.kiro/steering/spec-authoring.md`, `.kiro/steering/cli-ux.md`,
   `.kiro/steering/quality-and-safety.md`
 
-## Open decisions retained for design review
+## Accepted baselines and external release decisions
 
-- Exact graph expression language and its maximum node/edge, depth, and cost
-  budgets.
+- ADR-0007 accepts the design's closed typed predicate language, JSON definition
+  encoding, graph canonicalizer/compiler identities, and conservative hard
+  limits. A reviewed compiler-contract revision is required to change a hard
+  ceiling.
 - One shared minor schema allocation and exact result discriminators for graph
   actions across foundation and guided workflows.
-- Workspace snapshot/revision and idempotency record shapes, including recovery
-  outcomes and cancellation at durable commit intent.
+- Workspace snapshot/revision and exact-plan baselines are accepted by
+  ADR-0006; durable provider and recovery conformance remain open.
 - Trusted policy/assessment authority and retention/redaction rules.
 - Artifact-validation canonicalizer and freshness contract, including unknown
   field treatment and validator semantic compatibility.
