@@ -46,11 +46,12 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-005 — Implement snapshot decode/normalize and canonical layout discovery
 
-- [ ] FND-005 — Implement snapshot decode/normalize and canonical layout discovery
+- [x] FND-005 — Implement snapshot decode/normalize and canonical layout discovery
 - **Requirements:** REQ-006, REQ-013, REQ-017, REQ-018
 - **Depends on:** [FND-004]
 - Read canonical `.sdd/work/<slug>/work.yaml`; preserve immutable work ID, slug, revision, and explicit root rules. Implement no-workspace and invalid-explicit-root diagnostics without ancestor fallback. Do not mutate or reopen during pure evaluation.
 - **Done when:** empty, malformed, incompatible, multiple-active, invalid-root, and valid-work fixtures produce one immutable snapshot and stable diagnostics.
+- **Completed (2026-10-17):** `internal/engine/discovery.go` implements upward `.sdd` marker search (explicit root inspected only, invalid nearest marker never skipped), strict YAML decode of `workspace.yaml`/`work.yaml` (exact version integers, duplicate-ID/slug-mismatch/unknown-field/malformed rejection), ID-ordered immutable `Layout`, ID-only `SelectWork` with zero/single/ambiguous rules, and `LayoutDiagnosticCode` mapping to the catalog. `docs/decisions/0004-yaml-layout-decoding.md` admits `yaml.v3`. Executable fixtures cover every done-criterion case plus native-directory round-trip and byte-identical no-mutation proof.
 
 ### FND-006 — Implement typed canonicalization and digest set
 

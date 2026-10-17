@@ -97,6 +97,20 @@ func NewSourceRange(path string, start Position, end *Position) (SourceRange, er
 	if path == "" {
 		return SourceRange{}, fmt.Errorf("%w: source range path is required", ErrInvalidProtocolValue)
 	}
+	if start.line == 0 || start.column == 0 {
+		return SourceRange{}, fmt.Errorf("%w: source range start is not a valid position", ErrInvalidProtocolValue)
+	}
+	if start.unit != PositionUTF8Byte && start.unit != PositionUnicodeScalar {
+		return SourceRange{}, fmt.Errorf("%w: source range start has an unsupported unit", ErrInvalidProtocolValue)
+	}
+	if end != nil {
+		if end.line == 0 || end.column == 0 {
+			return SourceRange{}, fmt.Errorf("%w: source range end is not a valid position", ErrInvalidProtocolValue)
+		}
+		if end.unit != start.unit {
+			return SourceRange{}, fmt.Errorf("%w: source range units disagree", ErrInvalidProtocolValue)
+		}
+	}
 	var endCopy *Position
 	if end != nil {
 		copyValue := *end
