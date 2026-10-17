@@ -30,6 +30,23 @@ func TestResidualFailureIsRedactedAndNeverMasqueradesAsWorkspaceDamage(t *testin
 	}
 }
 
+func TestAssemblyAndIdentityContractFailuresKeepDistinctCategories(t *testing.T) {
+	t.Parallel()
+
+	assembly := mapFailure(errors.Join(errAssemble, errors.New("secret invalid field")))
+	if assembly.value.Code() != "DIAG_INTERNAL_ERROR" || assembly.value.Source().Kind() != "engine" {
+		t.Fatalf("assembly mapping = %s/%s", assembly.value.Code(), assembly.value.Source().Kind())
+	}
+	if assembly.value.Message() == "secret invalid field" {
+		t.Fatal("assembly mapping exposed low-level detail")
+	}
+
+	invalidIdentity := mapFailure(errIdentityInvalid)
+	if invalidIdentity.value.Code() != "DIAG_IDENTITY_INVALID" || invalidIdentity.exit != ExitExternalTool {
+		t.Fatalf("identity mapping = %s/%d", invalidIdentity.value.Code(), invalidIdentity.exit)
+	}
+}
+
 func TestWorkspaceSnapshotFailuresKeepConflictAndConfigurationCategories(t *testing.T) {
 	t.Parallel()
 

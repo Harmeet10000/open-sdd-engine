@@ -639,7 +639,7 @@ func TestExecuteDryRunHardening(t *testing.T) {
 	hostile := executeEngineWithPolicy(t, validLayoutFiles(), []byte("floor: strict\n"), &hostileIDs{ids: []string{"plan-1", "a/b"}})
 	if failed := hostile.Execute(context.Background(), mustStart(t)); failed.OK() {
 		t.Fatalf("hostile identity succeeded: %#v", failed)
-	} else if code := outcomeDiagnostic(t, failed).Code(); code != "DIAG_WORKSPACE_VERSION_INCOMPATIBLE" {
+	} else if code := outcomeDiagnostic(t, failed).Code(); code != "DIAG_IDENTITY_INVALID" {
 		t.Fatalf("hostile identity code = %q", code)
 	}
 	traversal := executeEngineWithPolicy(t, validLayoutFiles(), []byte("floor: strict\n"), &hostileIDs{ids: []string{"plan-1", ".."}})
@@ -650,6 +650,8 @@ func TestExecuteDryRunHardening(t *testing.T) {
 	empty := executeEngineWithPolicy(t, validLayoutFiles(), []byte("floor: strict\n"), &hostileIDs{ids: []string{"", "x"}})
 	if failed := empty.Execute(context.Background(), mustStart(t)); failed.OK() {
 		t.Fatalf("empty identity succeeded: %#v", failed)
+	} else if code := outcomeDiagnostic(t, failed).Code(); code != "DIAG_IDENTITY_INVALID" {
+		t.Fatalf("empty identity code = %q", code)
 	}
 }
 

@@ -243,7 +243,7 @@ func TestReadSetDigestIgnoresNativeRootAndBindsSafetyFacts(t *testing.T) {
 func TestParseWorkspacePathRejectsHostDependentOrEscapingForms(t *testing.T) {
 	t.Parallel()
 
-	for _, value := range []string{"", "/absolute", "../escape", "dir/../escape", `dir\escape`, "C:/absolute", "dir//file"} {
+	for _, value := range []string{"", "/absolute", "../escape", "dir/../escape", `dir\escape`, "C:/absolute", "dir//file", "dir/\x00file", "dir/\nfile"} {
 		if _, err := ParseWorkspacePath(value); !errors.Is(err, ErrSnapshotInvalid) {
 			t.Fatalf("ParseWorkspacePath(%q) error = %v", value, err)
 		}

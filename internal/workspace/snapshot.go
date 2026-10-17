@@ -77,6 +77,11 @@ func ParseWorkspacePath(raw string) (WorkspacePath, error) {
 	if cleaned != raw || cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") || strings.Contains(raw, "//") {
 		return "", fmt.Errorf("%w: path %q contains an empty, dot, or escaping component", ErrSnapshotInvalid, raw)
 	}
+	for _, character := range raw {
+		if character < 0x20 || character == 0x7f {
+			return "", fmt.Errorf("%w: path %q contains a control character", ErrSnapshotInvalid, raw)
+		}
+	}
 	for _, component := range strings.Split(raw, "/") {
 		if component == "" || component == "." || component == ".." || strings.Contains(component, ":") {
 			return "", fmt.Errorf("%w: path %q contains an invalid component", ErrSnapshotInvalid, raw)

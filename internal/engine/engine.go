@@ -30,6 +30,11 @@ var errAssemble = errors.New("engine assembly fault")
 // paths cannot make a failed identity provider safe to retry.
 var errIdentitySource = errors.New("identity source unavailable")
 
+// errIdentityInvalid marks a dependency that returned an identity unsafe for
+// durable protocol or path use. Availability and validity are separate: a
+// responding provider can still violate its contract.
+var errIdentityInvalid = errors.New("identity source returned an invalid identity")
+
 // These embedded files are the exact, reviewable definition bytes used by
 // the foundation preview. Their digests are decision inputs; changing either
 // file necessarily changes every newly computed plan digest.
@@ -347,18 +352,15 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return e.fail(cmd, ctxErr)
 	}
-	if planID == "" || workID == "" {
-		return e.fail(cmd, fmt.Errorf("%w: identity source minted an empty ID", errAssemble))
+	if !validGeneratedIdentity(planID) || !validGeneratedIdentity(workID) {
+		return e.fail(cmd, errIdentityInvalid)
 	}
 	// The slug is display data; safe-slug derivation arrives with journey
 	// profiles. Until then the immutable work ID doubles as a valid slug so
 	// the preview record decodes under the engine's own strict rules. IDs
-	// containing path separators are rejected instead of sanitized: silent
+	// not valid path components are rejected instead of sanitized: silent
 	// rewriting could collide two identities into one directory.
 	slug := workID
-	if strings.ContainsAny(slug, `/\`) {
-		return e.fail(cmd, fmt.Errorf("%w: derived slug is not a safe path component", errAssemble))
-	}
 	path := ".sdd/work/" + slug + "/work.yaml"
 	composition := cmd.Workflow()
 	if composition == "" {
@@ -505,6 +507,14 @@ func workspaceRefOf(layout Layout) (WorkspaceRef, error) {
 	return workspace, nil
 }
 
+func validGeneratedIdentity(value string) bool {
+	if value == "" || value != strings.TrimSpace(value) || strings.Contains(value, "/") {
+		return false
+	}
+	_, err := workspace.ParseWorkspacePath(value)
+	return err == nil
+}
+
 type mappedDiagnostic struct {
 	value Diagnostic
 	exit  ExitCode
@@ -620,10 +630,10 @@ func classifyFailure(err error) (failureMapping, string, map[string]any, []NextA
 		}, err.Error(), nil, nil
 	case errors.Is(err, errAssemble):
 		return failureMapping{
-			code: "DIAG_WORKSPACE_VERSION_INCOMPATIBLE", severity: SeverityError,
+			code: "DIAG_INTERNAL_ERROR", severity: SeverityCritical,
 			remediation: "Retry the command; a persistent failure means the installation is defective",
-			sourceKind:  "workspace", retryable: false, exit: ExitWorkspace,
-		}, err.Error(), nil, nil
+			sourceKind:  "engine", retryable: false, exit: ExitWorkspace,
+		}, "The engine could not assemble a valid protocol value", nil, nil
 	case errors.Is(err, ErrInvalidProtocolValue):
 		return failureMapping{
 			code: "DIAG_USAGE_ERROR", severity: SeverityError,
@@ -705,6 +715,12 @@ func classifyFailure(err error) (failureMapping, string, map[string]any, []NextA
 			code: "DIAG_IDENTITY_UNAVAILABLE", severity: SeverityError,
 			remediation: "Restore the system identity source and retry; no effects were applied",
 			sourceKind:  "engine", retryable: true, exit: ExitExternalTool,
+		}, err.Error(), nil, nil
+	case errors.Is(err, errIdentityInvalid):
+		return failureMapping{
+			code: "DIAG_IDENTITY_INVALID", severity: SeverityCritical,
+			remediation: "Repair or replace the identity provider; no effects were applied",
+			sourceKind:  "engine", retryable: false, exit: ExitExternalTool,
 		}, err.Error(), nil, nil
 	case errors.Is(err, ErrDependencyFault):
 		return failureMapping{

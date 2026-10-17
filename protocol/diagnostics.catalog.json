@@ -52,6 +52,15 @@
       "retryable": true
     },
     {
+      "code": "DIAG_IDENTITY_INVALID",
+      "owner": "sdd-engine-foundation",
+      "severity": "critical",
+      "exitCode": 5,
+      "sourceKinds": ["engine"],
+      "remediation": "Repair or replace the identity provider; no effects were applied.",
+      "retryable": false
+    },
+    {
       "code": "DIAG_INTERNAL_ERROR",
       "owner": "sdd-engine-foundation",
       "severity": "critical",
