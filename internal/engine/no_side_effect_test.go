@@ -31,6 +31,20 @@ func TestReadOnlyAndDryRunCommandsPreserveNativeTreeFacts(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(marker, "workspace.yaml"), []byte(discoveryWorkspace), 0o640); err != nil {
 		t.Fatal(err)
 	}
+	// Windows may publish directory modification times lazily after child
+	// creation. Pin every timestamp after setup so the before-snapshot cannot
+	// race delayed metadata propagation and falsely attribute it to a read.
+	fixedTime := time.Unix(1_700_000_000, 0)
+	for _, path := range []string{
+		filepath.Join(marker, "workspace.yaml"),
+		filepath.Join(marker, "work"),
+		marker,
+		root,
+	} {
+		if err := os.Chtimes(path, fixedTime, fixedTime); err != nil {
+			t.Fatalf("stabilize %s timestamps: %v", path, err)
+		}
+	}
 	policy, err := engine.NewPolicySnapshot(engine.PolicySnapshotInput{
 		Source: "test-policy",
 		Floor:  []byte("floor: strict\n"),
