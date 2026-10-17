@@ -15,8 +15,11 @@ or perform Git commits/merges. It consumes opaque versioned policy and
 authorization facts and typed effects. The engine coordinates facts between
 modules; this module commits only the effects it receives.
 
-This is a requirements document only. It does not claim that any requirement
-has been implemented or accepted by the project owner.
+Status: **Accepted for implementation on 2026-10-17** by
+`docs/decisions/0006-workspace-transaction-contract.md`. Acceptance fixes the
+module invariants; it does not claim implementation, native-platform
+certification, production authority-provider approval, destructive-retention
+approval, or publication of the allocated protocol extension.
 
 ## Glossary and contract boundary
 
@@ -623,23 +626,29 @@ automatic Git operations, process supervision, execution claims/leases,
 artifact semantic parsing, workflow graph compilation, completion/DONE
 decisions, legacy import UX, and automatic destructive repair of unknown files.
 
-## Unresolved decisions before requirements acceptance
+## Ratified implementation baselines and remaining release gates
 
-1. The project owner must choose the supported local filesystem/OS matrix and
-   whether cloud-sync mounts are blocked or warning-only; no implementation may
-   infer support from a path name.
-2. The project owner must approve the exact native transaction directory and
-   journal retention/compaction period, including the idempotency replay period.
-   The product-plan baseline is `.sdd/.runtime/transactions/<transaction-id>/`.
-3. The project owner must approve whether hard-linked managed files are always
-   rejected or only rejected for in-place mutation when atomic replacement is
-   available.
-4. The project owner must approve the additive foundation plan-operation
-   amendment and the negotiated version number; this spec does not invent a
-   public `1.1` release.
-5. The project owner must name trusted authorization/identity sources and the
-   rule for an authorization whose expiry passes after PREPARED. Organization
-   policy distribution and reviewer rules remain external.
+ADR-0006 resolves the choices needed to begin implementation:
+
+1. Transaction material uses `.sdd/.runtime/transactions/`; destructive
+   retention and compaction remain disabled until `DEC-03` supplies policy.
+2. Unknown, network, userspace, and sync-managed filesystems fail closed for
+   mutation until `DEC-02` certifies a native adapter. Read-only inspection may
+   report the unsupported capability without mutating.
+3. Hard-linked regular files are supported only through a proven atomic
+   directory-entry replacement that leaves the old inode untouched; otherwise
+   they fail as unsafe.
+4. `protocol/extension-inventory.json` centrally allocates workspace's effect
+   variants to the unpublished `1.1` extension. Implementations may build the
+   internal typed variants but may not claim public `1.1` support before the
+   foundation conformance schema is ratified.
+5. Authorization expiry is checked before `PREPARED`. Expiry after that point
+   does not undo intent; exact recovery rolls forward unless a separately
+   trusted restrictive revocation fact requires quarantine.
+
+`DEC-01`, `DEC-02`, `DEC-03`, `DEC-05`, native certification, and company
+numeric limits remain production/release gates. They do not permit an adapter
+to weaken these accepted invariants.
 
 ## References
 

@@ -2,12 +2,11 @@
 
 ## Status and task rules
 
-These are **provisional implementation tasks pending company decisions, upstream
-amendments, and review**. Every checkbox intentionally remains unchecked. A
-fake can prove module behavior but cannot satisfy production authorization,
-native filesystem durability, public protocol publication, or retention-policy
-acceptance. Proposed commands below are verification plans; this drafting pass
-did not run tests that do not yet exist.
+These tasks are **accepted for implementation on 2026-10-17** by ADR-0006.
+Every incomplete checkbox remains unchecked. A fake can prove module behavior
+but cannot satisfy production authorization, native filesystem durability,
+public protocol publication, or retention-policy acceptance. Proposed commands
+remain verification plans until their corresponding tests exist and pass.
 
 `dependsOn` contains only local task IDs and is the normative local DAG.
 Cross-spec, interface-ledger, amendment, and company-decision gates are listed
@@ -70,7 +69,7 @@ separately as external dependencies. Test drivers belong beside Go packages as
 - [ ] WS-TASK-005 — Harden containment and effect-time platform races
 - **Requirements:** `WS-REQ-001`, `WS-REQ-004`, `WS-REQ-005`, `WS-REQ-009`, `WS-REQ-012`
 - **dependsOn:** [WS-TASK-001, WS-TASK-002]
-- **External dependencies:** `IC-02`; `DEC-02`; requirements hard-link owner decision
+- **External dependencies:** `IC-02`; `DEC-02` for native certification
 - **Owned files/modules:** `internal/workspace` path normalization/collision keys and containment checks; `internal/platform/filesystem` no-follow root-handle traversal, file identity, safe replacement and capability facts; path fuzz corpus.
 - Reject traversal, separator aliases, reserved/device names, path limits, case/Unicode collisions, symlink/reparse escapes, unsafe hard links, and source/destination swaps. Repeat parent/final identity containment immediately before every effect; preserve permissions and unrelated files.
 - **Fixtures:** `FX-WS-003`–`FX-WS-006`, `FX-WS-018`–`FX-WS-020`, `FX-WS-044`.
@@ -172,9 +171,9 @@ separately as external dependencies. Test drivers belong beside Go packages as
 - **Verification (proposed):** `go test -race ./internal/...`; targeted `go test ./internal/workspace -fuzz 'Fuzz(Path|Manifest|Journal|Plan)'`; native matrix from WS-TASK-012; schema conformance command from foundation.
 - **Done when:** all 49 fixtures name exact expected and forbidden mutations, local and public outputs are deterministic, every persistence edge has before/after coverage, and no fake/platform skip is counted as native durability or production authority evidence.
 
-### WS-TASK-014 — Reconcile consumers and close the provisional review
+### WS-TASK-014 — Reconcile consumers and close the implementation review
 
-- [ ] WS-TASK-014 — Reconcile consumers and close the provisional review
+- [ ] WS-TASK-014 — Reconcile consumers and close the implementation review
 - **Requirements:** `WS-REQ-001`, `WS-REQ-002`, `WS-REQ-003`, `WS-REQ-004`, `WS-REQ-005`, `WS-REQ-006`, `WS-REQ-007`, `WS-REQ-008`, `WS-REQ-009`, `WS-REQ-010`, `WS-REQ-011`, `WS-REQ-012`
 - **dependsOn:** [WS-TASK-013]
 - **External dependencies:** accepted results for `AM-01`–`AM-03`, `AM-08`, `AM-09`, `AM-11`; decisions `DEC-01`–`DEC-05`; `sdd-guided-workflows/GW-014`, `GW-015`, `GW-016`, `GW-018`, `GW-019`
@@ -212,14 +211,15 @@ Fixture coverage is explicit in task bodies: `FX-WS-001`–`010` (001/005/012),
 `046`–`049` (001/003/011). WS-TASK-013
 executes the complete set and verifies there are no gaps.
 
-## Unresolved blockers
+## Remaining production/release gates
 
 - No production authorization claim until `DEC-01` identifies trusted providers.
 - No native durability/support claim until `DEC-02` and WS-TASK-012 pass on native runners.
 - No destructive compaction/expiry until `DEC-03` sets retention/privacy policy.
 - No public apply/recover schema or move/metadata effect until `DEC-05` and `AM-02`/`AM-03` are ratified.
 - No native migration implementation until an actual source/target pair and backup contract are approved under `AM-11`.
-- No hard-link support claim until the project owner chooses reject-all versus safe atomic replacement.
+- Hard-linked files are accepted only through proven atomic replacement; all
+  in-place or unproven behavior fails closed under ADR-0006.
 
 ## For the chosen ones
 

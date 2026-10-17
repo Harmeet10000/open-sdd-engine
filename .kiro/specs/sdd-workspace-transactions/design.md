@@ -2,13 +2,12 @@
 
 ## Status, authority, and review gate
 
-This is a **provisional design pending company decisions and design review**. It
-does not claim user approval, implementation, platform certification, or a
-published public-protocol extension. The repaired `requirements.md` is the
-normative behavior source for this draft. Where this document proposes a
-serialization, path, retention hook, or platform rule, the proposal remains
-blocked by `DEC-01` through `DEC-05` in
-`docs/kiro-input/prerequisite-review.md` as identified below.
+This design is **accepted for core implementation on 2026-10-17** by ADR-0006.
+It does not claim implementation, native platform certification, production
+authority-provider approval, destructive-retention approval, or a published
+public-protocol extension. `requirements.md` remains the normative behavior
+source. `DEC-01`, `DEC-02`, `DEC-03`, and `DEC-05` are capability/release gates
+as identified below; they no longer block pure/module/fake implementation.
 
 The module is deliberately deep. Callers supply selection coordinates, bounded
 read-set intent, an exact already-authorized plan, or an explicit recovery
@@ -282,11 +281,10 @@ At snapshot/planning time and again for each effect immediately before install:
    handles; a change is `DIAG_PRECONDITION_CHANGED`, never a new target;
 7. validate move destinations independently with the same algorithm.
 
-For a managed hard-linked file, the default provisional behavior is atomic
-replacement of the directory entry, which leaves the old inode and outside
-aliases unchanged. If the adapter cannot prove that behavior, or an effect
-would mutate in place, it returns `DIAG_UNSAFE_HARD_LINK`. Whether all hard
-links are rejected remains blocked by the owner decision in `requirements.md`.
+For a managed hard-linked file, the accepted behavior is atomic replacement of
+the directory entry, which leaves the old inode and outside aliases unchanged.
+If the adapter cannot prove that behavior, or an effect would mutate in place,
+it returns `DIAG_UNSAFE_HARD_LINK`.
 
 ## Collectively coherent snapshots
 
@@ -502,8 +500,8 @@ the plan or silently acquire a new grant.
 
 ## Internal durable records and proposed layout
 
-The concrete layout below is a **provisional storage proposal**, not an approved
-native-format or public-protocol version:
+The concrete layout below is the **accepted internal storage baseline**. It is
+not a new native-format or public-protocol version:
 
 ```text
 .sdd/
@@ -522,10 +520,11 @@ native-format or public-protocol version:
             └── committed-summary.json
 ```
 
-The exact directory and retention duration require `DEC-03` and the owner
-decision named in `requirements.md`. User-supplied idempotency keys are not used
-as filenames; filenames use a domain-separated digest and the original key is
-retained only according to the approved privacy policy.
+ADR-0006 fixes the directory at `.sdd/.runtime/transactions/`. Retention
+duration still requires `DEC-03`; until then destructive expiry/compaction is
+disabled and replay ambiguity facts are retained. User-supplied idempotency
+keys are not used as filenames; filenames use a domain-separated digest and
+the original key is retained only according to the approved privacy policy.
 
 ### `transaction.json`
 
@@ -997,7 +996,7 @@ second transaction or idempotency algorithm.
 Internal record schema IDs above are workspace-format details, not claims that
 the public protocol version is `1.1` or that native format `2` exists.
 
-## Open decisions and implementation blockers
+## Open production/release gates
 
 1. `DEC-01`: trusted provider/actor model, proof verification, and restrictive
    post-`PREPARED` revocation source. Fakes can test shape; production authority
@@ -1009,14 +1008,14 @@ the public protocol version is `1.1` or that native format `2` exists.
    retention/privacy. Compaction/destructive expiry is blocked.
 4. `DEC-05` plus `AM-02`/`AM-03`: one public extension allocation and effect
    vocabulary. No workspace-specific `1.1` may be published independently.
-5. Project-owner decisions in `requirements.md`: final transaction path,
-   hard-link policy, and authorization expiry behavior after intent.
-6. Company-selected numeric limits and performance budgets. The design defines
+5. Company-selected numeric limits and performance budgets. The design defines
    measurement and boundaries, not permanent values.
 
-Until those decisions are resolved, pure/module/fake tests may proceed, but no
-task may claim protocol freeze, destructive retention, native durability
-certification, production authorization, or move/metadata support.
+ADR-0006 resolves the transaction path, conservative hard-link behavior, and
+post-intent expiry rule. Pure/module/fake and internal extension implementation
+may proceed. Until the gates above are resolved, no task may claim protocol
+publication, destructive retention, native durability certification,
+production authorization, or public move/metadata support.
 
 ## References
 
