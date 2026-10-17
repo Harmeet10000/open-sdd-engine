@@ -41,6 +41,10 @@ and mixed-readiness cycle rejection, strong-Kleene predicate evaluation,
 opaque typed facts, mandatory-gate and skip-authority safeguards, immutable
 node-result consumption, deterministic readiness/blockers, snapshot-bound
 action proposals, and completion handoff data.
+The graph now also resolves composition as pure data: organization policy,
+project narrowing, trusted assessment, explicit increases, and an active
+composition are combined without permitting a downward override; any change to
+active work is emitted as a revision-bound proposal rather than applied.
 
 The implementation has passed package lint, race tests, full repository tests,
 the Draft-07 offline schema test, and Windows cross-compilation. These are
