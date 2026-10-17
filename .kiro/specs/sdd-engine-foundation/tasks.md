@@ -46,12 +46,12 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-005 — Implement snapshot decode/normalize and canonical layout discovery
 
-- [x] FND-005 — Implement snapshot decode/normalize and canonical layout discovery
+- [ ] FND-005 — Implement snapshot decode/normalize and canonical layout discovery
 - **Requirements:** REQ-006, REQ-013, REQ-017, REQ-018
 - **Depends on:** [FND-004]
 - Read canonical `.sdd/work/<slug>/work.yaml`; preserve immutable work ID, slug, revision, and explicit root rules. Implement no-workspace and invalid-explicit-root diagnostics without ancestor fallback. Do not mutate or reopen during pure evaluation.
 - **Done when:** empty, malformed, incompatible, multiple-active, invalid-root, and valid-work fixtures produce one immutable snapshot and stable diagnostics.
-- **Completed (2026-10-17):** `internal/engine/discovery.go` implements upward `.sdd` marker search (explicit root inspected only, invalid nearest marker never skipped), strict YAML decode of `workspace.yaml`/`work.yaml` (exact version integers, duplicate-ID/slug-mismatch/unknown-field/malformed rejection), ID-ordered immutable `Layout`, ID-only `SelectWork` with zero/single/ambiguous rules, and `LayoutDiagnosticCode` mapping to the catalog. `docs/decisions/0004-yaml-layout-decoding.md` admits `yaml.v3`. Executable fixtures cover every done-criterion case plus native-directory round-trip and byte-identical no-mutation proof.
+- **Implemented but not complete (reviewed 2026-10-17):** `internal/engine/discovery.go` implements upward `.sdd` marker search, strict YAML decoding, ID-ordered immutable `Layout`, active-only implicit selection, ID-only explicit selection, and stable layout diagnostics. Native and in-memory fixtures cover the shape matrix. The checkbox remains open because `Engine` still consumes `FileFacts` discovery directly instead of the coherent raw `Snapshotter`; concurrent changes between manifest/work reads can therefore produce a mixed-generation layout. Close this task only when the workspace raw-snapshot bridge supplies one accepted observation to the pure passes.
 
 ### FND-006 — Implement typed canonicalization and digest set
 
@@ -64,12 +64,12 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 
 ### FND-007 — Implement Engine.Execute error/cancellation rail
 
-- [x] FND-007 — Implement Engine.Execute error/cancellation rail
+- [ ] FND-007 — Implement Engine.Execute error/cancellation rail
 - **Requirements:** REQ-003, REQ-009, REQ-010, REQ-015
 - **Depends on:** [FND-003, FND-004, FND-005]
 - Implement decode → normalize → snapshot → decide → plan → verify → outcome for foundation commands. Map errors with `errors.Is/As` and explicit precedence, redact secrets, preserve cancellation, and propagate renderer writes.
 - **Done when:** malformed input, cancellation, workspace/schema error, conflict, policy error, external failure, validation failure, and internal defect each have stable category/code/exit behavior.
-- **Completed (2026-10-17):** `internal/engine/engine.go` implements `NewEngine`/`Execute`/`UnknownCommand` over version, doctor (with partial-check failures), status (selection reporting), and start dry-run (verified preview plan, non-authorizable warning). `mapFailure`/`classifyFailure` give every category a stable catalog code/severity/exit with explicit precedence (cancellation, assembly, usage, selection, workspace/schema, policy, observation faults, residual). The category matrix test proves all eight behaviors; conflict/external/validation producers are documented as integration-owned. Residual faults land exit-3 with a flagged future internal-error refinement note.
+- **Implemented but not complete (reviewed 2026-10-17):** `internal/engine/engine.go` implements `NewEngine`/`Execute`/`UnknownCommand`, cancellation, stable usage/workspace/policy diagnostics, a distinct external identity-source failure, and a non-panicking `DIAG_INTERNAL_ERROR` fallback. The matrix does not yet exercise real conflict or validation producers; those categories must be connected to workspace transactions and artifact validation before this done criterion is true. Do not satisfy the task with unused test-only sentinels.
 
 ### FND-008 — Implement version and help vertical slice
 
@@ -96,7 +96,7 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 - **Depends on:** [FND-005, FND-007]
 - Report zero/one/selected work item; permit new-work selection with unrelated active items; reject an invalid explicit root without parent fallback. Keep status read-only.
 - **Done when:** selection fixtures cover zero, one, many, explicit valid, explicit invalid, and valid-parent/invalid-root cases.
-- **Completed (2026-10-17):** Execute-level matrices for zero/one/many/explicit/explicit-invalid/valid-parent-invalid-root; status and doctor proven byte-identical read-only; explicit selection works despite unrelated active items; engine status outcomes validate against the published schema.
+- **Completed (2026-10-17):** Execute-level matrices for zero/one/many-active/explicit/explicit-invalid/valid-parent-invalid-root; completed records do not create implicit ambiguity but remain explicitly inspectable; status and doctor preserve native path entries, bytes, modes, sizes, and modification times; engine status outcomes validate against the published schema.
 
 ### FND-011 — Implement dry-run plan vertical slice
 
@@ -105,7 +105,7 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 - **Depends on:** [FND-006, FND-007, FND-010]
 - Build a meaningful, ordered, inspectable plan for canonical work creation with all digest/revision preconditions. Mark unsupported future operations non-authorizable; never apply.
 - **Done when:** `--dry-run` has non-empty operations, stable plan digest, structured next action, and byte-for-byte no-side-effect verification.
-- **Completed (2026-10-17):** non-empty verified plan with revision preconditions and non-authorizable operation; fixed IDs reproduce byte-identical envelopes (stable digest); structured `status --work` next action carrying the layout revision; proposed content dogfoods the strict decoder; separator-bearing and empty identities fail closed; byte-identical no-side-effect proof. Safe-slug derivation stays provisional (identity-as-slug) until journey profiles own it.
+- **Completed (2026-10-17):** non-empty verified plan with revision preconditions and a non-authorizable operation; fixed IDs reproduce byte-identical envelopes; exact checked-in preview workflow/validator definition bytes feed the definition digests; the valid `doctor --root` next action rechecks workspace/policy readiness without pretending the unapplied work exists; proposed content dogfoods the strict decoder; empty, separator-bearing, traversal, absolute, drive-qualified, and non-canonical targets fail closed; native path entries, bytes, modes, sizes, and modification times remain unchanged. Safe-slug derivation stays provisional (identity-as-slug) until journey profiles own it.
 
 ### FND-012 — Implement CLI parsing, stream separation, and exits
 

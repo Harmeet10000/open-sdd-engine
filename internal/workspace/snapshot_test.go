@@ -240,6 +240,19 @@ func TestReadSetDigestIgnoresNativeRootAndBindsSafetyFacts(t *testing.T) {
 	}
 }
 
+func TestParseWorkspacePathRejectsHostDependentOrEscapingForms(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{"", "/absolute", "../escape", "dir/../escape", `dir\escape`, "C:/absolute", "dir//file"} {
+		if _, err := ParseWorkspacePath(value); !errors.Is(err, ErrSnapshotInvalid) {
+			t.Fatalf("ParseWorkspacePath(%q) error = %v", value, err)
+		}
+	}
+	if got, err := ParseWorkspacePath(".sdd/work/item/work.yaml"); err != nil || got != ".sdd/work/item/work.yaml" {
+		t.Fatalf("canonical path = %q, %v", got, err)
+	}
+}
+
 func validRequest(t *testing.T, scope SnapshotScope) SnapshotRequest {
 	t.Helper()
 	return SnapshotRequest{

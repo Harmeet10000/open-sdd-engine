@@ -3,9 +3,10 @@ package engine
 import (
 	"encoding/json"
 	"fmt"
-	"path"
 	"regexp"
 	"strings"
+
+	"sdd.dev/sdd/internal/workspace"
 )
 
 var digestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
@@ -568,21 +569,8 @@ func validDigest(value string) bool {
 // Unix cannot become absolute or escape its workspace when applied on
 // Windows (or vice versa).
 func validRepositoryPath(value string) bool {
-	if value == "" || value != strings.TrimSpace(value) || path.IsAbs(value) {
-		return false
-	}
-	if value == "." || value == ".." || strings.HasPrefix(value, "../") {
-		return false
-	}
-	if path.Clean(value) != value || strings.ContainsAny(value, `\:`) {
-		return false
-	}
-	for _, character := range value {
-		if character < 0x20 || character == 0x7f {
-			return false
-		}
-	}
-	return true
+	_, err := workspace.ParseWorkspacePath(value)
+	return err == nil
 }
 
 func cloneMutationPlan(plan MutationPlan) MutationPlan {

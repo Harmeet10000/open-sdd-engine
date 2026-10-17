@@ -52,6 +52,15 @@
       "retryable": true
     },
     {
+      "code": "DIAG_INTERNAL_ERROR",
+      "owner": "sdd-engine-foundation",
+      "severity": "critical",
+      "exitCode": 3,
+      "sourceKinds": ["engine"],
+      "remediation": "Retry once; if the failure persists, report the build version and command without sensitive input.",
+      "retryable": false
+    },
+    {
       "code": "DIAG_USAGE_ERROR",
       "owner": "sdd-engine-foundation",
       "severity": "error",

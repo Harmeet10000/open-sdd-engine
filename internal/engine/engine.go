@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 
+	"sdd.dev/sdd/internal/workspace"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -131,7 +133,7 @@ func (e *Engine) UnknownCommand(requested string) Outcome {
 		ExitCode:         mapped.exit,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("engine: valid unknown-command outcome rejected: %v", err))
+		return internalFailureOutcome(CommandUnknown, requested)
 	}
 	return outcome
 }
@@ -188,7 +190,7 @@ func (e *Engine) version(ctx context.Context, cmd Command) Outcome {
 	})
 	outcome, err := NewOutcome(OutcomeInput{Command: cmd.Kind(), Result: &result, ExitCode: ExitSuccess})
 	if err != nil {
-		panic(fmt.Sprintf("engine: valid version outcome rejected: %v", err))
+		return internalFailureOutcome(cmd.Kind(), "")
 	}
 	return outcome
 }
@@ -244,7 +246,10 @@ func (e *Engine) doctor(ctx context.Context, cmd Command) Outcome {
 	if resultErr != nil {
 		return e.fail(cmd, resultErr)
 	}
-	workspace := workspaceRefOf(layout)
+	workspace, workspaceErr := workspaceRefOf(layout)
+	if workspaceErr != nil {
+		return e.fail(cmd, fmt.Errorf("%w: workspace reference: %w", errAssemble, workspaceErr))
+	}
 	outcome, err := NewOutcome(OutcomeInput{
 		Command:   cmd.Kind(),
 		Workspace: &workspace,
@@ -252,7 +257,7 @@ func (e *Engine) doctor(ctx context.Context, cmd Command) Outcome {
 		ExitCode:  ExitSuccess,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("engine: valid doctor outcome rejected: %v", err))
+		return internalFailureOutcome(cmd.Kind(), "")
 	}
 	return outcome
 }
@@ -271,7 +276,7 @@ func (e *Engine) doctorFailure(cmd Command, checks []map[string]any, cause error
 		ExitCode:    mapped.exit,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("engine: valid doctor failure outcome rejected: %v", err))
+		return internalFailureOutcome(cmd.Kind(), "")
 	}
 	return outcome
 }
@@ -297,7 +302,10 @@ func (e *Engine) status(ctx context.Context, cmd Command) Outcome {
 	if resultErr != nil {
 		return e.fail(cmd, fmt.Errorf("%w: status result: %w", errAssemble, resultErr))
 	}
-	workspace := workspaceRefOf(layout)
+	workspace, workspaceErr := workspaceRefOf(layout)
+	if workspaceErr != nil {
+		return e.fail(cmd, fmt.Errorf("%w: workspace reference: %w", errAssemble, workspaceErr))
+	}
 	outcome, err := NewOutcome(OutcomeInput{
 		Command:   cmd.Kind(),
 		Workspace: &workspace,
@@ -305,7 +313,7 @@ func (e *Engine) status(ctx context.Context, cmd Command) Outcome {
 		ExitCode:  ExitSuccess,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("engine: valid status outcome rejected: %v", err))
+		return internalFailureOutcome(cmd.Kind(), "")
 	}
 	return outcome
 }
@@ -455,7 +463,10 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 	if verifyErr != nil {
 		return e.fail(cmd, fmt.Errorf("%w: dry-run next action: %w", errAssemble, verifyErr))
 	}
-	workspace := workspaceRefOf(layout)
+	workspace, workspaceErr := workspaceRefOf(layout)
+	if workspaceErr != nil {
+		return e.fail(cmd, fmt.Errorf("%w: workspace reference: %w", errAssemble, workspaceErr))
+	}
 	outcome, err := NewOutcome(OutcomeInput{
 		Command:     cmd.Kind(),
 		Workspace:   &workspace,
@@ -465,7 +476,7 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 		ExitCode:    ExitSuccess,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("engine: valid dry-run outcome rejected: %v", err))
+		return internalFailureOutcome(cmd.Kind(), "")
 	}
 	return outcome
 }
@@ -486,12 +497,12 @@ func (e *Engine) discoverFor(ctx context.Context, cmd Command) (Layout, error) {
 	return DiscoverLayout(ctx, e.facts, root, explicit)
 }
 
-func workspaceRefOf(layout Layout) WorkspaceRef {
+func workspaceRefOf(layout Layout) (WorkspaceRef, error) {
 	workspace, err := NewWorkspaceRef(layout.Root(), layout.FormatVersion())
 	if err != nil {
-		panic(fmt.Sprintf("engine: discovered layout produced an invalid workspace reference: %v", err))
+		return WorkspaceRef{}, err
 	}
-	return workspace
+	return workspace, nil
 }
 
 type mappedDiagnostic struct {
@@ -522,9 +533,36 @@ func (e *Engine) fail(cmd Command, err error) Outcome {
 	input.ExitCode = mapped.exit
 	outcome, outcomeErr := NewOutcome(input)
 	if outcomeErr != nil {
-		panic(fmt.Sprintf("engine: valid failure outcome rejected: %v", outcomeErr))
+		return internalFailureOutcome(kind, input.RequestedCommand)
 	}
 	return outcome
+}
+
+// internalFailureOutcome is the non-panicking last-resort envelope for an
+// invariant failure while assembling another outcome. It intentionally does
+// not include the triggering error: low-level errors may carry secrets or
+// host paths, and a structured debug channel has not been ratified yet.
+func internalFailureOutcome(command CommandKind, requested string) Outcome {
+	if !validOutcomeCommand(command) {
+		command = CommandUnknown
+	}
+	if command == CommandUnknown && strings.TrimSpace(requested) == "" {
+		requested = "(unspecified)"
+	}
+	return Outcome{
+		command:          command,
+		requestedCommand: requested,
+		diagnostics: []Diagnostic{{
+			code:        "DIAG_INTERNAL_ERROR",
+			severity:    SeverityCritical,
+			message:     "The engine could not construct a valid protocol outcome",
+			source:      DiagnosticSource{kind: "engine"},
+			remediation: "Retry once; if the failure persists, report the build version and command without sensitive input",
+			retryable:   false,
+		}},
+		nextActions: []NextAction{},
+		exitCode:    ExitWorkspace,
+	}
 }
 
 type failureMapping struct {
@@ -537,15 +575,14 @@ type failureMapping struct {
 }
 
 // mapFailure renders one error into its stable diagnostic shape. The mapping
-// is total: observation-path faults land in the workspace family and
-// residual assembly faults land in the schema family, both exit 3 with a
-// truthful message. A future internal-error extension may narrow the
-// residual default; the messages and exit family are already stable.
+// is total: known observation faults retain their domain category and an
+// unknown residual becomes a redacted internal defect rather than being
+// mislabeled as a corrupt workspace.
 func mapFailure(err error) mappedDiagnostic {
 	mapping, message, metadata, next := classifyFailure(err)
 	source, sourceErr := NewDiagnosticSource(DiagnosticSourceInput{Kind: mapping.sourceKind})
 	if sourceErr != nil {
-		panic(fmt.Sprintf("engine: diagnostic source rejected: %v", sourceErr))
+		return internalMappedDiagnostic()
 	}
 	diagnostic, diagnosticErr := NewDiagnostic(DiagnosticInput{
 		Code:        mapping.code,
@@ -557,9 +594,14 @@ func mapFailure(err error) mappedDiagnostic {
 		Retryable:   mapping.retryable,
 	})
 	if diagnosticErr != nil {
-		panic(fmt.Sprintf("engine: failure diagnostic rejected: %v", diagnosticErr))
+		return internalMappedDiagnostic()
 	}
 	return mappedDiagnostic{value: diagnostic, exit: mapping.exit, next: next}
+}
+
+func internalMappedDiagnostic() mappedDiagnostic {
+	outcome := internalFailureOutcome(CommandUnknown, "(unspecified)")
+	return mappedDiagnostic{value: outcome.diagnostics[0], exit: outcome.exitCode}
 }
 
 func classifyFailure(err error) (failureMapping, string, map[string]any, []NextAction) {
@@ -628,6 +670,30 @@ func classifyFailure(err error) (failureMapping, string, map[string]any, []NextA
 			remediation: "Run from inside a workspace or pass a valid --root",
 			sourceKind:  "workspace", retryable: false, exit: ExitWorkspace,
 		}, err.Error(), nil, nil
+	case errors.Is(err, workspace.ErrSnapshotUnstable):
+		return failureMapping{
+			code: "DIAG_SNAPSHOT_UNSTABLE", severity: SeverityError,
+			remediation: "Wait for concurrent workspace changes to settle, then capture a new snapshot",
+			sourceKind:  "workspace", retryable: true, exit: ExitConflict,
+		}, err.Error(), nil, nil
+	case errors.Is(err, workspace.ErrRecoveryRequired):
+		return failureMapping{
+			code: "DIAG_RECOVERY_REQUIRED", severity: SeverityCritical,
+			remediation: "Run transaction recovery before evaluating or applying more work",
+			sourceKind:  "workspace", retryable: false, exit: ExitConflict,
+		}, err.Error(), nil, nil
+	case errors.Is(err, workspace.ErrLimitExceeded):
+		return failureMapping{
+			code: "DIAG_LIMIT_EXCEEDED", severity: SeverityError,
+			remediation: "Reduce the declared read set or raise the versioned workspace limit",
+			sourceKind:  "workspace", retryable: false, exit: ExitWorkspace,
+		}, err.Error(), nil, nil
+	case errors.Is(err, workspace.ErrSnapshotInvalid):
+		return failureMapping{
+			code: "DIAG_WORKSPACE_VERSION_INCOMPATIBLE", severity: SeverityError,
+			remediation: "Repair the invalid snapshot facts and capture one coherent generation",
+			sourceKind:  "workspace", retryable: false, exit: ExitWorkspace,
+		}, err.Error(), nil, nil
 	case errors.Is(err, errPolicySource):
 		return failureMapping{
 			code: "WORKFLOW_POLICY_UNAVAILABLE", severity: SeverityCritical,
@@ -648,10 +714,10 @@ func classifyFailure(err error) (failureMapping, string, map[string]any, []NextA
 		}, err.Error(), nil, nil
 	default:
 		return failureMapping{
-			code: "DIAG_WORKSPACE_VERSION_INCOMPATIBLE", severity: SeverityError,
-			remediation: "Retry the command; a persistent failure means the installation is defective",
-			sourceKind:  "workspace", retryable: false, exit: ExitWorkspace,
-		}, err.Error(), nil, nil
+			code: "DIAG_INTERNAL_ERROR", severity: SeverityCritical,
+			remediation: "Retry once; if the failure persists, report the build version and command without sensitive input",
+			sourceKind:  "engine", retryable: false, exit: ExitWorkspace,
+		}, "The engine encountered an unclassified internal failure", nil, nil
 	}
 }
 
