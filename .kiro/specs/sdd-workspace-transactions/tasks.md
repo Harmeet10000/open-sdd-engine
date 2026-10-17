@@ -27,6 +27,16 @@ separately as external dependencies. Test drivers belong beside Go packages as
 - **Verification (proposed):** `go test ./internal/workspace ./internal/engine -run 'Test(SnapshotExtension|FoundationSelectionHandoff|SnapshotCoherence|ArtifactIdentity|ReadOnly)'`; compare bytes, modes, mtimes, entries, identity records, journal tail, and transaction records before/after.
 - **Done when:** one bounded snapshot is collectively coherent or returns `DIAG_SNAPSHOT_UNSTABLE`/recovery-required; an incomplete transaction is never decoded as domain state; cancellation and every read retry leave authoritative state unchanged.
 - **Implementation progress (2026-10-15):** `internal/workspace.Reader` and the raw `Snapshot` bridge now enforce closed scopes, normalized ordered read sets, explicit limits, generation/active-transaction coherence, owned byte/value copies, domain-separated blob/read-set digests, and allocated/tombstoned/missing artifact-identity invariants. Package and race tests pass through a deterministic capture adapter. This task remains unchecked until the native capture adapter, read-side lock/generation record, stable stat/read/stat retry, transaction-status observation, canonical foundation selection handoff, and no-mutation filesystem fixtures exist.
+- **Implementation progress (2026-10-17):** Added a strict checksummed
+  `sdd.workspace-generation/1` record and a root-confined native capture adapter
+  using `os.Root`. The adapter rejects symlink components, bounds bytes,
+  captures native identity/link count on Linux, retries the whole read set on a
+  changed file or generation, reports an active transaction before reading
+  domain files, and has a filesystem before/after fixture proving capture does
+  not mutate. This task remains unchecked: interprocess read/write locking,
+  durable artifact-identity/transaction-status loading, the foundation
+  selection handoff, non-Linux native identity implementations, and native
+  certification are still absent.
 
 ### WS-TASK-002 — Deliver an authorized create-file commit/replay walking slice
 
@@ -39,6 +49,17 @@ separately as external dependencies. Test drivers belong beside Go packages as
 - **Fixtures:** `FX-WS-014`–`FX-WS-017`, `FX-WS-023`, `FX-WS-034`.
 - **Verification (proposed):** `go test ./internal/workspace ./internal/engine -run 'Test(CreateCommit|PlanDigest|AuthorizationBinding|LostReplyReplay)'` and, after protocol allocation, the foundation schema validator command established by `FND-002`.
 - **Done when:** pre/post revision, changed path, event ID, result digest, durability facts, and transaction ID are observable through the module seam; retry creates no second revision/event/effect; faults on either side of every persistence call return old state, resumable intent, or quarantine—never guessed success.
+- **Implementation progress (2026-10-17):** Added the immutable workspace-owned
+  exact `Plan` core for foundation create/update/delete effects, typed raw
+  preconditions, fixed revision intents, bounded staged content, a reusable
+  typed canonical-JSON codec, a domain-separated plan digest, non-circular
+  authorization/freshness verification, defensive copying, and the accepted
+  transaction transition table. Tests prove effect order changes identity,
+  grant IDs are excluded from plan identity, stale/revoked/mismatched grants
+  fail closed, and `PREPARED` cannot transition to `FAILED`. This task remains
+  unchecked: content submission, idempotency records, locking, durable
+  `PENDING`/staging/`PREPARED`, install, journal, committed summary, outcome,
+  replay, and recovery adapters are not yet implemented.
 
 ### WS-TASK-003 — Add update/delete revisions, tombstones, and stale-writer safety
 
