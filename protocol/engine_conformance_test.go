@@ -23,7 +23,7 @@ func conformanceEngine(t *testing.T, files map[string]testkit.MemFile) *engine.E
 		Facts:   testkit.NewMemFileFacts(files),
 		IDs:     testkit.NewSequenceIDSource("work"),
 		Policy:  testkit.NewFixedPolicySnapshotter(policy),
-		Workdir: "/repo",
+		Workdir: testkit.NativePath("/repo"),
 		Build:   engine.BuildMetadata{Version: "0.1.0-dev", Commit: "abc", BuildTime: "unknown", GoVersion: "go1.24.0"},
 	})
 	if err != nil {
@@ -93,7 +93,7 @@ func TestEngineVersionIgnoresBrokenFilesystem(t *testing.T) {
 		Facts:   facts,
 		IDs:     testkit.NewSequenceIDSource("work"),
 		Policy:  snapshotter,
-		Workdir: "/nonexistent",
+		Workdir: testkit.NativePath("/nonexistent"),
 		Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
 	})
 	if err != nil {

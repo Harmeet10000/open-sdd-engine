@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -21,6 +22,21 @@ var errPolicySource = errors.New("policy source unavailable")
 // marker is matched before ErrInvalidProtocolValue: the fault is the
 // engine's, not the caller's input.
 var errAssemble = errors.New("engine assembly fault")
+
+// errIdentitySource marks failure of the entropy/identity capability. It is
+// operationally distinct from workspace observation: repairing repository
+// paths cannot make a failed identity provider safe to retry.
+var errIdentitySource = errors.New("identity source unavailable")
+
+// These embedded files are the exact, reviewable definition bytes used by
+// the foundation preview. Their digests are decision inputs; changing either
+// file necessarily changes every newly computed plan digest.
+//
+//go:embed definitions/foundation-preview-workflow.yaml
+var foundationPreviewWorkflowDefinition []byte
+
+//go:embed definitions/foundation-preview-validators.yaml
+var foundationPreviewValidatorDefinition []byte
 
 // BuildMetadata identifies one reproducible build. Empty Commit and
 // BuildTime render as "unknown"; Version is required by NewEngine because a
@@ -277,7 +293,10 @@ func (e *Engine) status(ctx context.Context, cmd Command) Outcome {
 		}
 		items = append(items, work)
 	}
-	result := NewStatusResult(items)
+	result, resultErr := NewStatusResult(items)
+	if resultErr != nil {
+		return e.fail(cmd, fmt.Errorf("%w: status result: %w", errAssemble, resultErr))
+	}
 	workspace := workspaceRefOf(layout)
 	outcome, err := NewOutcome(OutcomeInput{
 		Command:   cmd.Kind(),
@@ -308,14 +327,14 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 	}
 	planID, err := e.ids.NewID()
 	if err != nil {
-		return e.fail(cmd, err)
+		return e.fail(cmd, errors.Join(errIdentitySource, fmt.Errorf("mint plan identity: %w", err)))
 	}
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return e.fail(cmd, ctxErr)
 	}
 	workID, err := e.ids.NewID()
 	if err != nil {
-		return e.fail(cmd, err)
+		return e.fail(cmd, errors.Join(errIdentitySource, fmt.Errorf("mint work identity: %w", err)))
 	}
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return e.fail(cmd, ctxErr)
@@ -372,8 +391,17 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 	if err != nil {
 		return e.fail(cmd, fmt.Errorf("%w: dry-run precondition: %w", errAssemble, err))
 	}
-	workflowDigest := BlobDigest("sdd.workflow-request/1", []byte("workflow="+cmd.Workflow()+";definition=unpinned-foundation-preview"))
-	validatorDigest := BlobDigest("sdd.validator-definition/1", []byte("definition=unpinned-foundation-preview"))
+	workflowDefinitionDigest := BlobDigest("sdd.workflow-definition/1", foundationPreviewWorkflowDefinition)
+	workflowRequestDigest := BlobDigest("sdd.workflow-request/1", []byte(cmd.Workflow()))
+	workflowDigest, err := DerivationDigest(
+		"sdd.effective-workflow-definition/1",
+		workflowDefinitionDigest,
+		workflowRequestDigest,
+	)
+	if err != nil {
+		return e.fail(cmd, fmt.Errorf("%w: effective workflow definition: %w", errAssemble, err))
+	}
+	validatorDigest := BlobDigest("sdd.validator-definition/1", foundationPreviewValidatorDefinition)
 	planDigest, err := ComputePlanDigest(PlanDigestInput{
 		PlanID: planID, WorkspaceID: layout.WorkspaceID(), WorkID: workID,
 		RevisionScope: RevisionWorkspace, ExpectedRevision: layout.Revision(),
@@ -412,14 +440,16 @@ func (e *Engine) startDryRun(ctx context.Context, cmd Command) Outcome {
 		Message:  "Preview only; durable application is not implemented in foundation",
 		Source:   source,
 	})
-	// The preview carries the verification step a future applier needs:
-	// re-observe this work item and compare revisions before applying, so a
-	// stale preview can never authorize changed state.
+	// The previewed work item does not exist, so suggesting `status --work`
+	// would be a guaranteed failure. Doctor is a valid, read-only next command
+	// that re-observes both workspace and policy readiness. A future applier
+	// will replace this with revision-bound application once that capability
+	// exists.
 	revision := layout.Revision()
 	verify, verifyErr := NewNextAction(NextActionInput{
-		Command:          "status",
-		Flags:            map[string]FlagValue{"work": StringFlag(workID)},
-		Reason:           "Verify the previewed work item before any future application",
+		Command:          "doctor",
+		Flags:            map[string]FlagValue{"root": StringFlag(layout.Root())},
+		Reason:           "Re-check workspace and policy readiness after reviewing this non-authorizable preview",
 		ExpectedRevision: &revision,
 	})
 	if verifyErr != nil {
@@ -603,6 +633,12 @@ func classifyFailure(err error) (failureMapping, string, map[string]any, []NextA
 			code: "WORKFLOW_POLICY_UNAVAILABLE", severity: SeverityCritical,
 			remediation: "Restore the trusted policy source and retry",
 			sourceKind:  "policy", retryable: false, exit: ExitPolicy,
+		}, err.Error(), nil, nil
+	case errors.Is(err, errIdentitySource):
+		return failureMapping{
+			code: "DIAG_IDENTITY_UNAVAILABLE", severity: SeverityError,
+			remediation: "Restore the system identity source and retry; no effects were applied",
+			sourceKind:  "engine", retryable: true, exit: ExitExternalTool,
 		}, err.Error(), nil, nil
 	case errors.Is(err, ErrDependencyFault):
 		return failureMapping{

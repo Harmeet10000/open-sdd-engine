@@ -53,6 +53,21 @@ func writeWorkspace(t *testing.T, root string) {
 	}
 }
 
+func TestCLIInvalidCompositionUsesFallbackEngine(t *testing.T) {
+	t.Parallel()
+
+	env := testEnv(t.TempDir())
+	env.Build.Version = ""
+	stdout, stderr, exit := runCLI(t, []string{"--json", "version"}, env)
+	if exit != 2 || stderr != "" {
+		t.Fatalf("invalid composition: exit=%d stderr=%q", exit, stderr)
+	}
+	envelope := decodeEnvelope(t, stdout)
+	if envelope["ok"] != false || envelope["command"] != "unknown" {
+		t.Fatalf("fallback envelope: %v", envelope)
+	}
+}
+
 func TestCLIVersionIgnoresWorkspace(t *testing.T) {
 	t.Parallel()
 
@@ -146,6 +161,21 @@ func TestCLIUnknownAndMalformedInput(t *testing.T) {
 	_, flagErr, flagExit := runCLI(t, []string{"--badflag"}, testEnv(root))
 	if flagExit != 2 || flagErr == "" {
 		t.Fatalf("global bad flag: exit=%d stderr=%q", flagExit, flagErr)
+	}
+
+	// A value after an unknown option is ambiguous and may be a credential.
+	// It must not be reclassified as an unknown command and reflected back.
+	secret := "supersecret-credential"
+	secretOut, _, secretExit := runCLI(t, []string{"--json", "--password", secret}, testEnv(root))
+	if secretExit != 2 {
+		t.Fatalf("unknown credential option exit = %d", secretExit)
+	}
+	if strings.Contains(secretOut, secret) {
+		t.Fatalf("unknown credential option leaked its value: %s", secretOut)
+	}
+	secretEnvelope := decodeEnvelope(t, secretOut)
+	if secretEnvelope["requestedCommand"] == secret {
+		t.Fatalf("ambiguous option value became requestedCommand: %v", secretEnvelope)
 	}
 
 	_, conflictErr, conflictExit := runCLI(t, []string{"--json", "--output=text", "version"}, testEnv(root))

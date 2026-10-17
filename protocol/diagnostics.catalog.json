@@ -43,6 +43,15 @@
       "retryable": false
     },
     {
+      "code": "DIAG_IDENTITY_UNAVAILABLE",
+      "owner": "sdd-engine-foundation",
+      "severity": "error",
+      "exitCode": 5,
+      "sourceKinds": ["engine"],
+      "remediation": "Restore the system identity source and retry; no effects were applied.",
+      "retryable": true
+    },
+    {
       "code": "DIAG_USAGE_ERROR",
       "owner": "sdd-engine-foundation",
       "severity": "error",

@@ -15,7 +15,7 @@ func TestHumanAndJSONRenderTheSamePreparedOutcome(t *testing.T) {
 	t.Parallel()
 
 	workspace := mustWorkspace(t, "/repo")
-	result := engine.NewStatusResult(nil)
+	result := mustStatusResult(t, nil)
 	action, err := engine.NewNextAction(engine.NextActionInput{
 		Command: "next",
 		Args:    []string{"two words", "it's-safe"},
@@ -215,7 +215,7 @@ func TestHumanSummariesCoverEveryResultVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := engine.NewStartDryRunResult(plan)
-	status := engine.NewStatusResult(nil)
+	status := mustStatusResult(t, nil)
 
 	cases := []struct {
 		name    string
@@ -305,13 +305,22 @@ func (shortWriter) Write(payload []byte) (int, error) { return len(payload) - 1,
 func successfulStatus(t *testing.T) engine.Outcome {
 	t.Helper()
 	workspace := mustWorkspace(t, "/repo")
-	result := engine.NewStatusResult(nil)
+	result := mustStatusResult(t, nil)
 	return mustOutcome(t, engine.OutcomeInput{
 		Command:   engine.CommandStatus,
 		Workspace: &workspace,
 		Result:    &result,
 		ExitCode:  engine.ExitSuccess,
 	})
+}
+
+func mustStatusResult(t *testing.T, workItems []engine.WorkRef) engine.Result {
+	t.Helper()
+	result, err := engine.NewStatusResult(workItems)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
 }
 
 func mustWorkspace(t *testing.T, root string) engine.WorkspaceRef {

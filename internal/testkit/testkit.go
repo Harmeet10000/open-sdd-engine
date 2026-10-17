@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -144,7 +145,7 @@ func NewMemFileFacts(files map[string]MemFile) *MemFileFacts {
 		if kind == "" {
 			kind = engine.FileKindRegular
 		}
-		cloned[filepath.Clean(name)] = MemFile{
+		cloned[memKey(name)] = MemFile{
 			Bytes:   append([]byte{}, file.Bytes...),
 			Mode:    file.Mode,
 			ModTime: file.ModTime,
@@ -157,7 +158,33 @@ func NewMemFileFacts(files map[string]MemFile) *MemFileFacts {
 // memKey normalizes a lookup path the same way constructor keys are
 // normalized, so slash-written fixtures resolve under the host separator.
 func memKey(abspath string) string {
-	return filepath.Clean(abspath)
+	return NativePath(abspath)
+}
+
+// NativePath maps a slash-rooted virtual test path to an absolute path on the
+// host OS. Unix keeps /repo as-is; Windows binds it to the temporary
+// directory's volume (for example D:\repo). Relative inputs remain relative.
+func NativePath(slashPath string) string {
+	if filepath.Separator != '\\' || !strings.HasPrefix(slashPath, "/") {
+		return filepath.Clean(filepath.FromSlash(slashPath))
+	}
+	volume := filepath.VolumeName(os.TempDir())
+	if volume == "" {
+		volume = "C:"
+	}
+	root := volume + string(filepath.Separator)
+	remainder := strings.TrimPrefix(slashPath, "/")
+	if remainder == "" {
+		return root
+	}
+	return filepath.Join(root, filepath.FromSlash(remainder))
+}
+
+func childPrefix(abspath string) string {
+	if filepath.Dir(abspath) == abspath {
+		return abspath
+	}
+	return abspath + string(filepath.Separator)
 }
 
 // InjectFault makes Stat and ReadFile for path fail with the given error.
@@ -202,10 +229,7 @@ func (m *MemFileFacts) Stat(ctx context.Context, abspath string) (engine.FileFac
 	file, ok := m.files[abspath]
 	hasChildren := false
 	if !ok && !hasFault {
-		prefix := abspath + string(filepath.Separator)
-		if abspath == string(filepath.Separator) {
-			prefix = string(filepath.Separator)
-		}
+		prefix := childPrefix(abspath)
 		for recorded := range m.files {
 			if recorded != abspath && len(recorded) > len(prefix) && recorded[:len(prefix)] == prefix {
 				hasChildren = true
@@ -290,10 +314,7 @@ func (m *MemFileFacts) ListDir(ctx context.Context, abspath string) ([]engine.Di
 	if fault, hasFault := m.faults[abspath]; hasFault {
 		return nil, fault
 	}
-	prefix := abspath + string(filepath.Separator)
-	if abspath == string(filepath.Separator) {
-		prefix = string(filepath.Separator)
-	}
+	prefix := childPrefix(abspath)
 	children := map[string]engine.FileKind{}
 	known := false
 	for recorded, file := range m.files {

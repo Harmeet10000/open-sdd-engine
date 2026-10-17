@@ -56,11 +56,11 @@ func TestSemanticDigestIgnoresFormattingOnlyChanges(t *testing.T) {
 		"/b/.sdd/workspace.yaml":     {Bytes: []byte("formatVersion: 1\nworkspaceId: ws-1\nrevision: 2\n")},
 		"/b/.sdd/work/one/work.yaml": {Bytes: []byte(formatted)},
 	})
-	first, err := engine.DiscoverLayout(context.Background(), facts, "/a", "")
+	first, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/a"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := engine.DiscoverLayout(context.Background(), facts, "/b", "")
+	second, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/b"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestSemanticDigestIgnoresFormattingOnlyChanges(t *testing.T) {
 	changed, err := engine.DiscoverLayout(context.Background(), testkit.NewMemFileFacts(map[string]testkit.MemFile{
 		"/c/.sdd/workspace.yaml":     {Bytes: []byte("formatVersion: 1\nworkspaceId: ws-1\nrevision: 2\n")},
 		"/c/.sdd/work/one/work.yaml": {Bytes: []byte("schemaVersion: 1\nworkId: work-1\nslug: one\nrevision: 4\nstatus: done\ncomposition: quick-spec\n")},
-	}), "/c", "")
+	}), testkit.NativePath("/c"), "")
 	if err != nil {
 		t.Fatal(err)
 	}

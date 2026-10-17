@@ -111,7 +111,7 @@ func TestResultConstructorsDefensivelyCopyCollections(t *testing.T) {
 
 	work := mustWork(t, "work-1", "one")
 	items := []engine.WorkRef{work}
-	status := engine.NewStatusResult(items)
+	status := mustStatusResult(t, items)
 	items[0] = mustWork(t, "work-2", "two")
 	statusValue, ok := status.Status()
 	if !ok || statusValue.WorkItems()[0].ID() != "work-1" {
@@ -148,7 +148,7 @@ func TestOutcomeRejectsInvalidStateCombinations(t *testing.T) {
 	t.Parallel()
 
 	workspace := mustWorkspace(t)
-	status := engine.NewStatusResult(nil)
+	status := mustStatusResult(t, nil)
 	diagnostic := mustDiagnostic(t, engine.DiagnosticInput{
 		Code:     "DIAG_USAGE_ERROR",
 		Severity: engine.SeverityError,
@@ -184,7 +184,7 @@ func TestEmptyCollectionsMarshalAsArraysAndObjects(t *testing.T) {
 	t.Parallel()
 
 	workspace := mustWorkspace(t)
-	result := engine.NewStatusResult(nil)
+	result := mustStatusResult(t, nil)
 	action, err := engine.NewNextAction(engine.NextActionInput{
 		Command: "status",
 		Reason:  "Refresh status",
@@ -309,11 +309,10 @@ func TestStructuredSourceAndFlagValidation(t *testing.T) {
 		t.Fatalf("infinite flag error = %v", err)
 	}
 
-	// Zero work references never reach the wire: the constructor drops them.
-	result := engine.NewStatusResult([]engine.WorkRef{{}, mustWork(t, "work-1", "one")})
-	status, ok := result.Status()
-	if !ok || len(status.WorkItems()) != 1 || status.WorkItems()[0].ID() != "work-1" {
-		t.Fatalf("zero work reference was not dropped: %#v", status)
+	// Zero work references never reach the wire: the constructor rejects the
+	// whole result instead of silently dropping observed data.
+	if _, err := engine.NewStatusResult([]engine.WorkRef{{}, mustWork(t, "work-1", "one")}); !errors.Is(err, engine.ErrInvalidProtocolValue) {
+		t.Fatalf("zero work reference error = %v", err)
 	}
 }
 
@@ -440,7 +439,7 @@ func TestProtocolAccessorsAndMarshalVariants(t *testing.T) {
 		marshalValidJSON(t, result)
 	}
 
-	statusResult := engine.NewStatusResult([]engine.WorkRef{work})
+	statusResult := mustStatusResult(t, []engine.WorkRef{work})
 	outcome := mustOutcome(t, engine.OutcomeInput{
 		Command: engine.CommandStatus, Workspace: &workspace, Work: &work, Result: &statusResult,
 		Diagnostics: []engine.Diagnostic{diagnostic}, NextActions: []engine.NextAction{action}, ExitCode: engine.ExitSuccess,
@@ -478,7 +477,7 @@ func TestRedactedCoversEveryResultVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	statusResult := engine.NewStatusResult([]engine.WorkRef{work})
+	statusResult := mustStatusResult(t, []engine.WorkRef{work})
 	statusOutcome := mustOutcome(t, engine.OutcomeInput{
 		Command: engine.CommandStatus, Workspace: &workspace, Work: &work, Result: &statusResult,
 		Diagnostics: []engine.Diagnostic{diagnostic}, NextActions: []engine.NextAction{action}, ExitCode: engine.ExitSuccess,
@@ -619,6 +618,11 @@ func TestOperationAndPreconditionVariants(t *testing.T) {
 		{Kind: engine.OperationDeleteFile, Path: "old", Content: &content, ExpectedDigest: digest},
 		{Kind: "future", Path: "file"},
 		{Kind: engine.OperationCreateFile},
+		{Kind: engine.OperationCreateFile, Path: "../escape", Content: &content, ContentDigest: digest},
+		{Kind: engine.OperationCreateFile, Path: "/absolute", Content: &content, ContentDigest: digest},
+		{Kind: engine.OperationCreateFile, Path: `dir\escape`, Content: &content, ContentDigest: digest},
+		{Kind: engine.OperationCreateFile, Path: "C:/absolute", Content: &content, ContentDigest: digest},
+		{Kind: engine.OperationCreateFile, Path: "dir/../escape", Content: &content, ContentDigest: digest},
 	}
 	for _, input := range invalidOperations {
 		if _, err := engine.NewPlanOperation(input); !errors.Is(err, engine.ErrInvalidProtocolValue) {
@@ -643,6 +647,9 @@ func TestOperationAndPreconditionVariants(t *testing.T) {
 		{Kind: engine.PreconditionDigest, Path: "file", ExpectedDigest: "bad"},
 		{Kind: "future", Path: "file"},
 		{Kind: engine.PreconditionAbsent},
+		{Kind: engine.PreconditionAbsent, Path: "../escape"},
+		{Kind: engine.PreconditionAbsent, Path: "/absolute"},
+		{Kind: engine.PreconditionAbsent, Path: `dir\escape`},
 	}
 	for _, input := range invalidPreconditions {
 		if _, err := engine.NewPlanPrecondition(input); !errors.Is(err, engine.ErrInvalidProtocolValue) {
@@ -747,6 +754,15 @@ func mustWorkspace(t *testing.T) engine.WorkspaceRef {
 func mustWork(t *testing.T, id, slug string) engine.WorkRef {
 	t.Helper()
 	value, err := engine.NewWorkRef(engine.WorkRefInput{ID: id, Slug: slug, Revision: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
+func mustStatusResult(t *testing.T, workItems []engine.WorkRef) engine.Result {
+	t.Helper()
+	value, err := engine.NewStatusResult(workItems)
 	if err != nil {
 		t.Fatal(err)
 	}

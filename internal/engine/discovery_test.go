@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"sdd.dev/sdd/internal/engine"
@@ -49,11 +50,11 @@ func TestDiscoverLayoutFindsNearestMarker(t *testing.T) {
 	t.Parallel()
 
 	facts := testkit.NewMemFileFacts(discoveryFiles(nil))
-	layout, err := engine.DiscoverLayout(context.Background(), facts, "/repo/.sdd/work/apple", "")
+	layout, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/repo/.sdd/work/apple"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if layout.Root() != "/repo" || layout.WorkspaceID() != "ws-1" || layout.FormatVersion() != 1 || layout.Revision() != 11 {
+	if layout.Root() != testkit.NativePath("/repo") || layout.WorkspaceID() != "ws-1" || layout.FormatVersion() != 1 || layout.Revision() != 11 {
 		t.Fatalf("layout identity is wrong: %#v", layout)
 	}
 	works := layout.Works()
@@ -84,7 +85,7 @@ func TestDiscoverLayoutFindsZeroWorkItems(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			facts := testkit.NewMemFileFacts(files)
-			layout, err := engine.DiscoverLayout(context.Background(), facts, "/repo", "")
+			layout, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/repo"), "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -148,7 +149,7 @@ func TestDiscoverLayoutRejectsInvalidLayouts(t *testing.T) {
 func assertIncompatible(t *testing.T, files map[string]testkit.MemFile) {
 	t.Helper()
 	facts := testkit.NewMemFileFacts(files)
-	_, err := engine.DiscoverLayout(context.Background(), facts, "/repo", "")
+	_, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/repo"), "")
 	if !errors.Is(err, engine.ErrWorkspaceIncompatible) {
 		t.Fatalf("layout error = %v", err)
 	}
@@ -176,7 +177,7 @@ func TestDiscoverLayoutRejectsFileMarker(t *testing.T) {
 		"/repo/.sdd/workspace.yaml": {Bytes: []byte(discoveryWorkspace)},
 		"/repo/child/.sdd":          {Bytes: []byte("not a directory\n")},
 	})
-	_, err := engine.DiscoverLayout(context.Background(), facts, "/repo/child", "")
+	_, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/repo/child"), "")
 	if !errors.Is(err, engine.ErrWorkspaceIncompatible) {
 		t.Fatalf("file marker was skipped or misreported: %v", err)
 	}
@@ -188,7 +189,7 @@ func TestDiscoverLayoutReportsMissingWorkspace(t *testing.T) {
 	facts := testkit.NewMemFileFacts(map[string]testkit.MemFile{
 		"/elsewhere/file.txt": {Bytes: []byte("unrelated\n")},
 	})
-	_, err := engine.DiscoverLayout(context.Background(), facts, "/elsewhere", "")
+	_, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/elsewhere"), "")
 	if !errors.Is(err, engine.ErrWorkspaceNotFound) {
 		t.Fatalf("missing workspace error = %v", err)
 	}
@@ -205,7 +206,7 @@ func TestDiscoverLayoutNeverSkipsAnInvalidMarker(t *testing.T) {
 		"/repo/deep/.sdd/workspace.yaml":   {Bytes: []byte("formatVersion: 99\nworkspaceId: ws-x\nrevision: 1\n")},
 		"/repo/deep/.sdd/work/a/work.yaml": {Bytes: []byte(discoveryWorkApple)},
 	})
-	_, err := engine.DiscoverLayout(context.Background(), facts, "/repo/deep", "")
+	_, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/repo/deep"), "")
 	if !errors.Is(err, engine.ErrWorkspaceIncompatible) {
 		t.Fatalf("invalid nearest marker was skipped or misreported: %v", err)
 	}
@@ -218,15 +219,19 @@ func TestDiscoverLayoutHonorsExplicitRootWithoutFallback(t *testing.T) {
 		"/repo/child/note.txt": {Bytes: []byte("start here\n")},
 	}))
 
-	layout, err := engine.DiscoverLayout(context.Background(), facts, "/repo/child", "/repo")
+	layout, err := engine.DiscoverLayout(
+		context.Background(), facts, testkit.NativePath("/repo/child"), testkit.NativePath("/repo"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if layout.Root() != "/repo" || len(layout.Works()) != 2 {
+	if layout.Root() != testkit.NativePath("/repo") || len(layout.Works()) != 2 {
 		t.Fatalf("explicit root layout is wrong: %#v", layout)
 	}
 
-	_, err = engine.DiscoverLayout(context.Background(), facts, "/repo/child", "/repo/child")
+	_, err = engine.DiscoverLayout(
+		context.Background(), facts, testkit.NativePath("/repo/child"), testkit.NativePath("/repo/child"),
+	)
 	if !errors.Is(err, engine.ErrInvalidRoot) {
 		t.Fatalf("invalid explicit root error = %v", err)
 	}
@@ -239,7 +244,7 @@ func TestSelectWorkFollowsExplicitRootRules(t *testing.T) {
 	t.Parallel()
 
 	facts := testkit.NewMemFileFacts(discoveryFiles(nil))
-	layout, err := engine.DiscoverLayout(context.Background(), facts, "/repo", "")
+	layout, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/repo"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +285,7 @@ func TestSelectWorkFollowsExplicitRootRules(t *testing.T) {
 	single, err := engine.DiscoverLayout(context.Background(), testkit.NewMemFileFacts(map[string]testkit.MemFile{
 		"/repo/.sdd/workspace.yaml":       {Bytes: []byte(discoveryWorkspace)},
 		"/repo/.sdd/work/apple/work.yaml": {Bytes: []byte(discoveryWorkApple)},
-	}), "/repo", "")
+	}), testkit.NativePath("/repo"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,17 +298,56 @@ func TestSelectWorkFollowsExplicitRootRules(t *testing.T) {
 	}
 }
 
+func TestSelectWorkImplicitlyConsidersOnlyActiveRecords(t *testing.T) {
+	t.Parallel()
+
+	doneApple := strings.Replace(discoveryWorkApple, "status: active", "status: done", 1)
+	layout, err := engine.DiscoverLayout(context.Background(), testkit.NewMemFileFacts(map[string]testkit.MemFile{
+		"/repo/.sdd/workspace.yaml":       {Bytes: []byte(discoveryWorkspace)},
+		"/repo/.sdd/work/apple/work.yaml": {Bytes: []byte(doneApple)},
+		"/repo/.sdd/work/zebra/work.yaml": {Bytes: []byte(discoveryWorkZebra)},
+	}), testkit.NativePath("/repo"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	implicit, err := engine.SelectWork(layout, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if implicit.ID() != "work-a" {
+		t.Fatalf("implicit selection returned %q, want the only active record", implicit.ID())
+	}
+	explicit, err := engine.SelectWork(layout, "work-b")
+	if err != nil || explicit.Status() != "done" {
+		t.Fatalf("explicit historical selection = %#v, %v", explicit, err)
+	}
+
+	doneZebra := strings.Replace(discoveryWorkZebra, "status: active", "status: done", 1)
+	doneOnly, err := engine.DiscoverLayout(context.Background(), testkit.NewMemFileFacts(map[string]testkit.MemFile{
+		"/repo/.sdd/workspace.yaml":       {Bytes: []byte(discoveryWorkspace)},
+		"/repo/.sdd/work/apple/work.yaml": {Bytes: []byte(doneApple)},
+		"/repo/.sdd/work/zebra/work.yaml": {Bytes: []byte(doneZebra)},
+	}), testkit.NativePath("/repo"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected, selectErr := engine.SelectWork(doneOnly, ""); selectErr != nil || selected.ID() != "" {
+		t.Fatalf("completed-only implicit selection = %#v, %v", selected, selectErr)
+	}
+}
+
 func TestDiscoverLayoutPropagatesCancellationAndRejectsBadInput(t *testing.T) {
 	t.Parallel()
 
 	facts := testkit.NewMemFileFacts(discoveryFiles(nil))
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := engine.DiscoverLayout(cancelled, facts, "/repo", ""); !errors.Is(err, context.Canceled) {
+	if _, err := engine.DiscoverLayout(cancelled, facts, testkit.NativePath("/repo"), ""); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled discovery error = %v", err)
 	}
 
-	if _, err := engine.DiscoverLayout(context.Background(), nil, "/repo", ""); !errors.Is(err, engine.ErrInvalidProtocolValue) {
+	if _, err := engine.DiscoverLayout(context.Background(), nil, testkit.NativePath("/repo"), ""); !errors.Is(err, engine.ErrInvalidProtocolValue) {
 		t.Fatalf("nil facts error = %v", err)
 	}
 	if _, err := engine.DiscoverLayout(context.Background(), facts, "", ""); !errors.Is(err, engine.ErrInvalidProtocolValue) {
@@ -316,7 +360,7 @@ func TestDiscoverLayoutLeavesNoMutation(t *testing.T) {
 
 	files := discoveryFiles(nil)
 	facts := testkit.NewMemFileFacts(files)
-	if _, err := engine.DiscoverLayout(context.Background(), facts, "/repo/.sdd/work/apple", ""); err != nil {
+	if _, err := engine.DiscoverLayout(context.Background(), facts, testkit.NativePath("/repo/.sdd/work/apple"), ""); err != nil {
 		t.Fatal(err)
 	}
 	for name, file := range files {

@@ -29,7 +29,7 @@ func executeEngineWithPolicy(
 		Facts:   testkit.NewMemFileFacts(files),
 		IDs:     ids,
 		Policy:  testkit.NewFixedPolicySnapshotter(policy),
-		Workdir: "/repo",
+		Workdir: testkit.NativePath("/repo"),
 		Build:   engine.BuildMetadata{Version: "0.1.0-dev", Commit: "abc", BuildTime: "unknown", GoVersion: "go1.24.0"},
 	})
 	if err != nil {
@@ -103,7 +103,7 @@ func TestExecuteMapsEveryFailureCategory(t *testing.T) {
 		{name: "ambiguous selection", files: ambiguous, command: engine.NewStatusCommand("", ""), wantCode: "DIAG_WORKSPACE_SELECTION_AMBIGUOUS", wantExit: engine.ExitWorkspace, wantSeverity: engine.SeverityError},
 		{name: "missing work item", files: validLayoutFiles(), command: engine.NewStatusCommand("work-missing", ""), wantCode: "DIAG_WORK_ITEM_NOT_FOUND", wantExit: engine.ExitWorkspace, wantSeverity: engine.SeverityError},
 		{name: "policy unavailable", files: validLayoutFiles(), command: engine.NewDoctorCommand(""), policyFault: errors.New("vault sealed"), wantCode: "WORKFLOW_POLICY_UNAVAILABLE", wantExit: engine.ExitPolicy, wantSeverity: engine.SeverityCritical},
-		{name: "identity fault", files: validLayoutFiles(), command: mustStart(t), idFault: errors.New("namespace exhausted"), wantCode: "DIAG_WORKSPACE_VERSION_INCOMPATIBLE", wantExit: engine.ExitWorkspace, wantSeverity: engine.SeverityError},
+		{name: "identity fault", files: validLayoutFiles(), command: mustStart(t), idFault: errors.New("namespace exhausted"), wantCode: "DIAG_IDENTITY_UNAVAILABLE", wantExit: engine.ExitExternalTool, wantSeverity: engine.SeverityError},
 	}
 
 	for _, test := range tests {
@@ -125,7 +125,7 @@ func TestExecuteMapsEveryFailureCategory(t *testing.T) {
 				Facts:   testkit.NewMemFileFacts(test.files),
 				IDs:     ids,
 				Policy:  snapshotter,
-				Workdir: "/repo",
+				Workdir: testkit.NativePath("/repo"),
 				Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
 			})
 			if err != nil {
@@ -191,7 +191,7 @@ func TestExecuteStatusReportsSelection(t *testing.T) {
 	if !ok || len(status.WorkItems()) != 1 || status.WorkItems()[0].ID() != "work-b" {
 		t.Fatalf("implicit selection: %#v", status)
 	}
-	if outcome.Workspace() == nil || outcome.Workspace().Root() != "/repo" {
+	if outcome.Workspace() == nil || outcome.Workspace().Root() != testkit.NativePath("/repo") {
 		t.Fatalf("status workspace: %#v", outcome.Workspace())
 	}
 
@@ -258,7 +258,7 @@ func TestExecuteStartDryRunPreviewsWithoutApplying(t *testing.T) {
 		Facts:   facts,
 		IDs:     testkit.NewSequenceIDSource("work"),
 		Policy:  testkit.NewFixedPolicySnapshotter(policy),
-		Workdir: "/repo",
+		Workdir: testkit.NativePath("/repo"),
 		Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
 	})
 	if err != nil {
@@ -349,7 +349,7 @@ func TestNewEngineRejectsIncompleteDependencies(t *testing.T) {
 		Facts:   testkit.NewMemFileFacts(nil),
 		IDs:     testkit.NewSequenceIDSource("work"),
 		Policy:  testkit.NewFixedPolicySnapshotter(policy),
-		Workdir: "/repo",
+		Workdir: testkit.NativePath("/repo"),
 		Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
 	}
 	broken := []func(*engine.Dependencies){
@@ -383,7 +383,7 @@ func TestExecuteRelativeRootResolvesAgainstWorkdir(t *testing.T) {
 		Facts:   facts,
 		IDs:     testkit.NewSequenceIDSource("work"),
 		Policy:  testkit.NewFixedPolicySnapshotter(policy),
-		Workdir: "/repo",
+		Workdir: testkit.NativePath("/repo"),
 		Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
 	})
 	if err != nil {
@@ -393,7 +393,7 @@ func TestExecuteRelativeRootResolvesAgainstWorkdir(t *testing.T) {
 	if !outcome.OK() {
 		t.Fatalf("relative root did not resolve against workdir: %#v", outcomeDiagnostic(t, outcome))
 	}
-	if outcome.Workspace().Root() != "/repo/sub" {
+	if outcome.Workspace().Root() != testkit.NativePath("/repo/sub") {
 		t.Fatalf("relative root workspace = %q", outcome.Workspace().Root())
 	}
 }
@@ -416,7 +416,7 @@ func TestExecuteCancelledDryRunNeverSucceeds(t *testing.T) {
 		Facts:   testkit.NewMemFileFacts(validLayoutFiles()),
 		IDs:     testkit.NewSequenceIDSource("work"),
 		Policy:  policy,
-		Workdir: "/repo",
+		Workdir: testkit.NativePath("/repo"),
 		Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
 	})
 	if err != nil {
@@ -455,13 +455,40 @@ func TestExecuteDryRunQuotesHostileWorkflow(t *testing.T) {
 		parsed, err := engine.DiscoverLayout(context.Background(), testkit.NewMemFileFacts(map[string]testkit.MemFile{
 			"/preview/.sdd/workspace.yaml":                                  {Bytes: []byte(discoveryWorkspace)},
 			("/preview/.sdd/work/" + dryRun.Plan().WorkID() + "/work.yaml"): {Bytes: []byte(*content)},
-		}), "/preview", "")
+		}), testkit.NativePath("/preview"), "")
 		if err != nil {
 			t.Fatalf("workflow %q content failed strict decode: %v", workflow, err)
 		}
 		if parsed.Works()[0].Composition() != workflow {
 			t.Fatalf("workflow %q not preserved: %q", workflow, parsed.Works()[0].Composition())
 		}
+	}
+}
+
+func TestExecuteDryRunDefinitionDigestsBindRequestedWorkflow(t *testing.T) {
+	t.Parallel()
+
+	planFor := func(workflow string) engine.MutationPlan {
+		eng := executeEngine(t, validLayoutFiles())
+		command, err := engine.NewStartDryRunCommand("intent", workflow, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		outcome := eng.Execute(context.Background(), command)
+		if !outcome.OK() {
+			t.Fatalf("workflow %q: %#v", workflow, outcomeDiagnostic(t, outcome))
+		}
+		result, _ := outcome.Result().StartDryRun()
+		return result.Plan()
+	}
+
+	quick := planFor("quick-spec")
+	bug := planFor("bug-fix")
+	if quick.WorkflowDefinitionDigest() == bug.WorkflowDefinitionDigest() {
+		t.Fatal("requested workflow did not change the effective workflow-definition digest")
+	}
+	if quick.ValidatorDefinitionDigest() != bug.ValidatorDefinitionDigest() {
+		t.Fatal("unchanged validator definition produced different digests")
 	}
 }
 
@@ -477,7 +504,7 @@ func TestNewEngineIsolatesBuildInputs(t *testing.T) {
 		Facts:   testkit.NewMemFileFacts(nil),
 		IDs:     testkit.NewSequenceIDSource("work"),
 		Policy:  testkit.NewFixedPolicySnapshotter(policy),
-		Workdir: "/repo",
+		Workdir: testkit.NativePath("/repo"),
 		Build:   engine.BuildMetadata{Version: "0.1.0-dev", BuildInputs: inputs},
 	})
 	if err != nil {
@@ -512,11 +539,11 @@ func TestExecuteDoctorMatrices(t *testing.T) {
 	}
 
 	explicit := executeEngine(t, validLayoutFiles())
-	rooted := explicit.Execute(context.Background(), engine.NewDoctorCommand("/repo"))
+	rooted := explicit.Execute(context.Background(), engine.NewDoctorCommand(testkit.NativePath("/repo")))
 	if !rooted.OK() {
 		t.Fatalf("explicit-root doctor: %#v", outcomeDiagnostic(t, rooted))
 	}
-	if workspace := rooted.Workspace(); workspace == nil || workspace.Root() != "/repo" {
+	if workspace := rooted.Workspace(); workspace == nil || workspace.Root() != testkit.NativePath("/repo") {
 		t.Fatalf("explicit-root doctor workspace: %#v", workspace)
 	}
 }
@@ -534,7 +561,7 @@ func TestExecuteStatusIsReadOnlyAndExplicit(t *testing.T) {
 		Facts:   facts,
 		IDs:     testkit.NewSequenceIDSource("work"),
 		Policy:  testkit.NewFixedPolicySnapshotter(policy),
-		Workdir: "/repo",
+		Workdir: testkit.NativePath("/repo"),
 		Build:   engine.BuildMetadata{Version: "0.1.0-dev"},
 	})
 	if err != nil {
@@ -559,7 +586,7 @@ func TestExecuteStatusIsReadOnlyAndExplicit(t *testing.T) {
 		}
 	}
 
-	invalid := eng.Execute(context.Background(), engine.NewStatusCommand("", "/repo/child"))
+	invalid := eng.Execute(context.Background(), engine.NewStatusCommand("", testkit.NativePath("/repo/child")))
 	if invalid.OK() || invalid.ExitCode() != engine.ExitWorkspace {
 		t.Fatalf("invalid explicit root status: %#v", invalid)
 	}
@@ -577,8 +604,11 @@ func TestExecuteDryRunHardening(t *testing.T) {
 		t.Fatalf("dry-run: %#v", outcomeDiagnostic(t, outcome))
 	}
 	actions := outcome.NextActions()
-	if len(actions) != 1 || actions[0].Command() != "status" {
+	if len(actions) != 1 || actions[0].Command() != "doctor" {
 		t.Fatalf("dry-run next actions: %v", actions)
+	}
+	if actions[0].Flags()["root"].Value() != testkit.NativePath("/repo") {
+		t.Fatalf("dry-run next action does not target the workspace root: %v", actions[0].Flags())
 	}
 	revision := actions[0].ExpectedRevision()
 	if revision == nil || *revision != 11 {
@@ -598,7 +628,7 @@ func TestExecuteDryRunHardening(t *testing.T) {
 	parsed, err := engine.DiscoverLayout(context.Background(), testkit.NewMemFileFacts(map[string]testkit.MemFile{
 		"/preview/.sdd/workspace.yaml":                         {Bytes: []byte(discoveryWorkspace)},
 		("/preview/.sdd/work/" + plan.WorkID() + "/work.yaml"): {Bytes: []byte(*content)},
-	}), "/preview", "")
+	}), testkit.NativePath("/preview"), "")
 	if err != nil {
 		t.Fatalf("proposed content failed strict decode: %v", err)
 	}
@@ -611,6 +641,10 @@ func TestExecuteDryRunHardening(t *testing.T) {
 		t.Fatalf("hostile identity succeeded: %#v", failed)
 	} else if code := outcomeDiagnostic(t, failed).Code(); code != "DIAG_WORKSPACE_VERSION_INCOMPATIBLE" {
 		t.Fatalf("hostile identity code = %q", code)
+	}
+	traversal := executeEngineWithPolicy(t, validLayoutFiles(), []byte("floor: strict\n"), &hostileIDs{ids: []string{"plan-1", ".."}})
+	if failed := traversal.Execute(context.Background(), mustStart(t)); failed.OK() {
+		t.Fatalf("traversal identity succeeded: %#v", failed)
 	}
 
 	empty := executeEngineWithPolicy(t, validLayoutFiles(), []byte("floor: strict\n"), &hostileIDs{ids: []string{"", "x"}})

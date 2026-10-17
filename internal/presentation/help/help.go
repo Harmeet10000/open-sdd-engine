@@ -41,8 +41,8 @@ Usage:
 
 Reports executable metadata, current-directory access, workspace discovery,
 canonical layout, schema compatibility, and policy source status. Exits 3
-when no workspace, the workspace is malformed, or required policy is
-unavailable. Never mutates.
+when no workspace or the workspace is malformed, and exits 6 when required
+policy is unavailable. Never mutates.
 `
 
 // StatusHelp details the status command.

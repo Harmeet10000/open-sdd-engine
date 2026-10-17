@@ -1,6 +1,7 @@
 package testkit_test
 
 import (
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -8,6 +9,28 @@ import (
 	"sdd.dev/sdd/internal/testkit"
 	"sdd.dev/sdd/internal/workspace"
 )
+
+func TestNativePathProducesHostAbsolutePaths(t *testing.T) {
+	t.Parallel()
+
+	for _, virtual := range []string{"/", "/repo", "/repo/.sdd/workspace.yaml"} {
+		native := testkit.NativePath(virtual)
+		if !filepath.IsAbs(native) {
+			t.Fatalf("NativePath(%q) = %q, want a host-absolute path", virtual, native)
+		}
+	}
+
+	facts := testkit.NewMemFileFacts(map[string]testkit.MemFile{
+		"/repo/a.yaml": {Bytes: []byte("a\n")},
+	})
+	entries, err := facts.ListDir(t.Context(), testkit.NativePath("/"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "repo" {
+		t.Fatalf("root listing = %#v, want the virtual repo directory", entries)
+	}
+}
 
 func TestFixedSnapshotterIsolatesSnapshots(t *testing.T) {
 	t.Parallel()

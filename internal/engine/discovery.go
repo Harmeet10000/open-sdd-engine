@@ -132,8 +132,9 @@ func (l Layout) Works() []WorkRecord { return append([]WorkRecord{}, l.works...)
 
 // SelectWork resolves one work record from a layout. An explicit ID matches
 // by immutable identity only, never by slug. An empty ID selects the single
-// record when exactly one exists, succeeds vacuously when none exists, and
-// fails with an *AmbiguousSelectionError otherwise.
+// active record when exactly one exists, succeeds vacuously when none exists,
+// and fails with an *AmbiguousSelectionError otherwise. Explicit immutable-ID
+// selection may address a historical/non-active record for inspection.
 func SelectWork(layout Layout, workID string) (WorkRecord, error) {
 	if workID != "" {
 		for _, record := range layout.works {
@@ -143,14 +144,20 @@ func SelectWork(layout Layout, workID string) (WorkRecord, error) {
 		}
 		return WorkRecord{}, fmt.Errorf("%w: %q", ErrWorkNotFound, workID)
 	}
-	switch len(layout.works) {
+	active := make([]WorkRecord, 0, len(layout.works))
+	for _, record := range layout.works {
+		if record.status == "active" {
+			active = append(active, record)
+		}
+	}
+	switch len(active) {
 	case 0:
 		return WorkRecord{}, nil
 	case 1:
-		return layout.works[0], nil
+		return active[0], nil
 	default:
-		candidates := make([]string, 0, len(layout.works))
-		for _, record := range layout.works {
+		candidates := make([]string, 0, len(active))
+		for _, record := range active {
 			candidates = append(candidates, record.id)
 		}
 		return WorkRecord{}, &AmbiguousSelectionError{Candidates: candidates}

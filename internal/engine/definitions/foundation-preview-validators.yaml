@@ -1,0 +1,11 @@
+schemaVersion: 1
+definitionId: foundation-preview-validators
+validators:
+  - id: work-manifest-structural-v1
+    guarantees:
+      - strict-yaml-decode
+      - supported-schema-version
+      - immutable-work-id-present
+      - slug-matches-directory
+      - canonical-repository-relative-plan-path
+authoritativeForApplication: false

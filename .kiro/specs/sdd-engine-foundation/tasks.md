@@ -85,9 +85,9 @@ Each task has a stable ID, requirement links, and a real dependency list. Waves 
 - [x] FND-009 — Implement doctor vertical slice
 - **Requirements:** REQ-005, REQ-013
 - **Depends on:** [FND-005, FND-007]
-- Check executable, build metadata, current directory, workspace/layout/schema status, and required policy source. Return exit `3` for no workspace, malformed workspace, incompatible workspace, or missing required policy; never mutate or call external tools.
+- Check executable, build metadata, current directory, workspace/layout/schema status, and required policy source. Return exit `3` for no workspace, malformed workspace, or incompatible workspace; return policy/permission exit `6` when required policy is unavailable, consistent with REQ-009; never mutate or call external tools.
 - **Done when:** no-workspace is not reported as a passing doctor result and all checks share outcome rendering.
-- **Completed (2026-10-17):** five structured checks (executable, workdir, workspace, schema, policy) with malformed/incompatible/missing-policy matrices; failures carry partial checks in a schema-valid non-null result with exit `3`; engine doctor outcomes validate against the published schema including the failure case.
+- **Completed (2026-10-17):** five structured checks (executable, workdir, workspace, schema, policy) with malformed/incompatible/missing-policy matrices; failures carry partial checks in a schema-valid non-null result with exit `3` for workspace/configuration faults and exit `6` for the required-policy fault; engine doctor outcomes validate against the published schema including the failure case.
 
 ### FND-010 — Implement status and explicit-selection vertical slice
 
